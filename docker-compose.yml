@@ -12,14 +12,30 @@ services:
 
   # ---------------------------------------------------------------------------
   # Public Layer — reverse proxy
-  # Optional: you can also hit the api directly on http://localhost:8000
+  #   :3000 → web (SvelteKit)
+  #   :8000 → api (FastAPI)
   # ---------------------------------------------------------------------------
   nginx:
     image: nginx:alpine
     ports:
-      - "3000:80"
+      - "3000:3000"
+      - "8000:8000"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+      - web
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Frontend Layer — SvelteKit web app (dev server)
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: ./services/web
+    volumes:
+      - ./services/web:/app
+      - /app/node_modules
     depends_on:
       - api
     restart: unless-stopped
@@ -31,8 +47,6 @@ services:
   api:
     build:
       context: ./services/api
-    ports:
-      - "8000:8000"
     environment:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       QDRANT_HOST: ${QDRANT_HOST:-qdrant}
