@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Download docling/HF models into the image so runtime works fully offline.
+# HF_HOME pins the cache to a stable path that survives container restarts.
+ENV HF_HOME=/opt/hf-models
 RUN python -c "from docling.document_converter import DocumentConverter; DocumentConverter()"
 
 COPY worker/ ./worker/
