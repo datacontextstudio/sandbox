@@ -10,11 +10,12 @@
 	let topK = $state(5);
 	let generate = $state(true);
 	let llmModel = $state('llama3');
+	let includeResults = $state(false);
 
 	let isLoading = $state(false);
 	let queryError = $state<string | null>(null);
 	let answer = $state<string | null>(null);
-	let results = $state<QueryResult[]>([]);
+	let results = $state<QueryResult[] | null>(null);
 	let hasSearched = $state(false);
 
 	let lastQueryCurl = $state<string | null>(null);
@@ -28,7 +29,7 @@
 		setTimeout(() => (copied = false), 2000);
 	}
 
-	function buildCurl(req: { query: string; collections: string[]; top_k: number; generate: boolean; llm_model: string }): string {
+	function buildCurl(req: { query: string; collections: string[]; top_k: number; generate: boolean; llm_model: string; include_results: boolean }): string {
 		const body = JSON.stringify(req, null, 2);
 		return `curl -X POST http://localhost:8000/query \\\n  -H "Content-Type: application/json" \\\n  -d '${body}'`;
 	}
@@ -58,7 +59,7 @@
 		isLoading = true;
 		queryError = null;
 		answer = null;
-		results = [];
+		results = null;
 		lastQueryCurl = null;
 		hasSearched = true;
 		activeTab = 'query';
@@ -68,14 +69,15 @@
 			collections: [...selectedCollections],
 			top_k: topK,
 			generate,
-			llm_model: llmModel
+			llm_model: llmModel,
+			include_results: includeResults
 		};
 		lastQueryCurl = buildCurl(req);
 
 		try {
 			const resp = await queryCollections(req);
 			answer = resp.answer;
-			results = resp.results;
+			results = resp.results ?? null;
 		} catch (e) {
 			queryError = String(e);
 		} finally {
@@ -165,6 +167,11 @@
 				<span>Generate AI answer</span>
 			</label>
 
+			<label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+				<input type="checkbox" bind:checked={includeResults} class="rounded text-blue-600" />
+				<span>Return Results</span>
+			</label>
+
 			{#if generate}
 				<label class="flex items-center gap-2 text-sm text-gray-700">
 					<span>Model</span>
@@ -244,7 +251,7 @@
 						</div>
 					{/if}
 
-					{#if results.length > 0}
+					{#if results && results.length > 0}
 						<div class="space-y-3">
 							<h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">
 								{results.length} result{results.length !== 1 ? 's' : ''}
@@ -267,7 +274,7 @@
 								</div>
 							{/each}
 						</div>
-					{:else if !isLoading && !queryError}
+					{:else if results !== null && !isLoading && !queryError}
 						<div class="rounded-xl border border-gray-200 bg-white px-5 py-8 text-center">
 							<p class="text-sm text-gray-400">No results found for this query.</p>
 						</div>

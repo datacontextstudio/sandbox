@@ -44,7 +44,7 @@ export interface QueryResult {
 
 export interface QueryResponse {
 	query: string;
-	results: QueryResult[];
+	results: QueryResult[] | null;
 	answer: string | null;
 }
 
@@ -54,6 +54,7 @@ export interface QueryRequest {
 	top_k: number;
 	generate: boolean;
 	llm_model: string;
+	include_results: boolean;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {

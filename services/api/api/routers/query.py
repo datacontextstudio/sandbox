@@ -56,4 +56,8 @@ async def query(req: QueryRequest) -> QueryResponse:
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail=f"LLM service error: {exc}")
 
-    return QueryResponse(query=req.query, results=results, answer=answer)
+    return QueryResponse(
+        query=req.query,
+        results=results if req.include_results else None,
+        answer=answer,
+    )

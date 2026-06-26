@@ -34,6 +34,7 @@ class QueryRequest(BaseModel):
     top_k: int = 5
     generate: bool = False
     llm_model: str = "llama3"
+    include_results: bool = True
 
 
 class QueryResult(BaseModel):
@@ -47,7 +48,7 @@ class QueryResult(BaseModel):
 
 class QueryResponse(BaseModel):
     query: str
-    results: list[QueryResult]
+    results: list[QueryResult] | None = None
     answer: str | None = None
 
 
