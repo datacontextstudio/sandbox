@@ -56,23 +56,23 @@ services:
     volumes:
       - storage_data:/data/documents
     depends_on:
-      - ollama
+      # - ollama
       - qdrant
       - redis
     restart: unless-stopped
 
-  # ---------------------------------------------------------------------------
-  # LLM + Embedding Layer — Ollama
-  # Pull models after first start: docker-compose exec ollama ollama pull llama3
-  # Embedding model:               docker-compose exec ollama ollama pull nomic-embed-text
-  # ---------------------------------------------------------------------------
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
+  # # ---------------------------------------------------------------------------
+  # # LLM + Embedding Layer — Ollama
+  # # Pull models after first start: docker-compose exec ollama ollama pull llama3
+  # # Embedding model:               docker-compose exec ollama ollama pull nomic-embed-text
+  # # ---------------------------------------------------------------------------
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   restart: unless-stopped
 
   # ---------------------------------------------------------------------------
   # Vector DB Layer — Qdrant
@@ -115,7 +115,7 @@ services:
       - storage_data:/data/documents
     depends_on:
       - redis
-      - ollama
+      # - ollama
       - qdrant
     restart: unless-stopped
 
@@ -123,7 +123,7 @@ services:
 # Volumes
 # ---------------------------------------------------------------------------
 volumes:
-  ollama_data:    # Ollama model cache (~GB per model)
+#  ollama_data:    # Ollama model cache (~GB per model)
   qdrant_data:    # Vector DB collections + indexes
   redis_data:     # Redis AOF persistence
   storage_data:   # Raw documents before ingestion
