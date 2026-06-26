@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 QUEUE_KEY = "dcs:queue:ingestion"
 DLQ_KEY = "dcs:dlq:ingestion"
+BLPOP_TIMEOUT = 5
 
 
 def _job_key(job_id: str) -> str:
@@ -56,11 +57,16 @@ def _handle_message(r: redis_lib.Redis, raw: bytes) -> None:
 
 
 def run(stop_event=None) -> None:
-    r = redis_lib.from_url(settings.redis_url, decode_responses=False)
+    r = redis_lib.from_url(
+        settings.redis_url,
+        decode_responses=False,
+        socket_timeout=BLPOP_TIMEOUT + 1,
+        socket_connect_timeout=5,
+    )
     logger.info("Worker listening on %s", QUEUE_KEY)
 
     while stop_event is None or not stop_event.is_set():
-        result = r.blpop(QUEUE_KEY, timeout=5)
+        result = r.blpop(QUEUE_KEY, timeout=BLPOP_TIMEOUT)
         if result is None:
             continue
         _, raw = result
