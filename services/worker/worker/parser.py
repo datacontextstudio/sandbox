@@ -1,11 +1,17 @@
 import logging
 from pathlib import Path
 
-from docling.document_converter import DocumentConverter
+from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import PdfPipelineOptions, TesseractCliOcrOptions
 
 logger = logging.getLogger(__name__)
 
-_converter = DocumentConverter()
+# Explicitly use tesseract — rapidocr's torch/PP-OCRv6 path is broken on this platform.
+_pipeline_options = PdfPipelineOptions(ocr_options=TesseractCliOcrOptions())
+_converter = DocumentConverter(
+    format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=_pipeline_options)}
+)
 
 
 def parse_document(file_path: str) -> str:
