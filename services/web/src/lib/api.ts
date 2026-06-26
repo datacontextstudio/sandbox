@@ -4,6 +4,22 @@ export interface CollectionsResponse {
 	collections: string[];
 }
 
+export interface DocumentInfo {
+	job_id: string;
+	file_path: string;
+	chunk_count: number;
+}
+
+export interface DocumentsResponse {
+	collection_name: string;
+	documents: DocumentInfo[];
+}
+
+export interface DeleteResponse {
+	deleted: boolean;
+	detail: string;
+}
+
 export interface IngestResponse {
 	job_id: string;
 	status: 'pending' | 'processing' | 'completed' | 'failed';
@@ -80,4 +96,22 @@ export async function queryCollections(req: QueryRequest): Promise<QueryResponse
 		body: JSON.stringify(req)
 	});
 	return handleResponse<QueryResponse>(res);
+}
+
+export async function getCollectionDocuments(name: string): Promise<DocumentsResponse> {
+	const res = await fetch(`${BASE}/collections/${encodeURIComponent(name)}/documents`);
+	return handleResponse<DocumentsResponse>(res);
+}
+
+export async function deleteDocument(collectionName: string, jobId: string): Promise<DeleteResponse> {
+	const res = await fetch(
+		`${BASE}/collections/${encodeURIComponent(collectionName)}/documents/${encodeURIComponent(jobId)}`,
+		{ method: 'DELETE' }
+	);
+	return handleResponse<DeleteResponse>(res);
+}
+
+export async function deleteCollection(name: string): Promise<DeleteResponse> {
+	const res = await fetch(`${BASE}/collections/${encodeURIComponent(name)}`, { method: 'DELETE' });
+	return handleResponse<DeleteResponse>(res);
 }

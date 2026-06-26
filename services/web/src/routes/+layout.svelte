@@ -27,6 +27,14 @@
 		>
 			Query
 		</a>
+		<a
+			href="/collections"
+			class="text-sm font-medium transition-colors"
+			class:text-white={page.url.pathname === '/collections'}
+			class:text-gray-400={page.url.pathname !== '/collections'}
+		>
+			Collections
+		</a>
 	</nav>
 	<main class="max-w-5xl mx-auto px-6 py-8">
 		{@render children()}

@@ -1,4 +1,5 @@
 import os
+import shutil
 
 import aiofiles
 
@@ -12,3 +13,7 @@ async def save_upload(job_id: str, filename: str, data: bytes) -> str:
     async with aiofiles.open(dest, "wb") as f:
         await f.write(data)
     return dest
+
+
+def delete_document_dir(job_id: str) -> None:
+    shutil.rmtree(os.path.join(settings.storage_path, job_id), ignore_errors=True)

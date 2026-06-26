@@ -38,3 +38,11 @@ async def get_job_fields(job_id: str) -> dict[str, str] | None:
         return fields if fields else None
     finally:
         await r.aclose()
+
+
+async def delete_job(job_id: str) -> None:
+    r = aioredis.from_url(settings.redis_url, decode_responses=True)
+    try:
+        await r.delete(_job_key(job_id))
+    finally:
+        await r.aclose()

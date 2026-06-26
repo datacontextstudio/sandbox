@@ -59,3 +59,19 @@ class JobStatusResponse(BaseModel):
 
 class CollectionsResponse(BaseModel):
     collections: list[str]
+
+
+class DocumentInfo(BaseModel):
+    job_id: str
+    file_path: str
+    chunk_count: int
+
+
+class DocumentsResponse(BaseModel):
+    collection_name: str
+    documents: list[DocumentInfo]
+
+
+class DeleteResponse(BaseModel):
+    deleted: bool
+    detail: str
