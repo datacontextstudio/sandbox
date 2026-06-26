@@ -7,6 +7,7 @@
 	let { data }: { data: PageData } = $props();
 
 	let collections = $state<string[]>(untrack(() => data.collections.slice()));
+	let loadError = $state<string | null>(untrack(() => data.error));
 
 	interface CollectionState {
 		expanded: boolean;
@@ -15,27 +16,32 @@
 		documents: DocumentInfo[];
 	}
 
-	let collectionState = $state<Record<string, CollectionState>>({});
+	let collectionStateMap = $state<Record<string, CollectionState>>({});
+
+	$effect(() => {
+		for (const name of collections) {
+			if (!collectionStateMap[name]) {
+				collectionStateMap[name] = { expanded: false, loading: false, error: null, documents: [] };
+			}
+		}
+	});
 
 	function stateFor(name: string): CollectionState {
-		if (!collectionState[name]) {
-			collectionState[name] = { expanded: false, loading: false, error: null, documents: [] };
-		}
-		return collectionState[name];
+		return collectionStateMap[name] ?? { expanded: false, loading: false, error: null, documents: [] };
 	}
 
 	async function toggleExpand(name: string) {
 		const s = stateFor(name);
 		if (s.expanded) {
-			collectionState[name] = { ...s, expanded: false };
+			collectionStateMap[name] = { ...s, expanded: false };
 			return;
 		}
-		collectionState[name] = { ...s, expanded: true, loading: true, error: null };
+		collectionStateMap[name] = { ...s, expanded: true, loading: true, error: null };
 		try {
 			const resp = await getCollectionDocuments(name);
-			collectionState[name] = { ...collectionState[name], loading: false, documents: resp.documents };
+			collectionStateMap[name] = { ...collectionStateMap[name], loading: false, documents: resp.documents };
 		} catch (e) {
-			collectionState[name] = { ...collectionState[name], loading: false, error: String(e) };
+			collectionStateMap[name] = { ...collectionStateMap[name], loading: false, error: String(e) };
 		}
 	}
 
@@ -44,7 +50,7 @@
 		try {
 			await deleteDocument(collectionName, jobId);
 			const s = stateFor(collectionName);
-			collectionState[collectionName] = {
+			collectionStateMap[collectionName] = {
 				...s,
 				documents: s.documents.filter((d) => d.job_id !== jobId)
 			};
@@ -58,9 +64,9 @@
 		try {
 			await deleteCollection(name);
 			collections = collections.filter((c) => c !== name);
-			const next = { ...collectionState };
+			const next = { ...collectionStateMap };
 			delete next[name];
-			collectionState = next;
+			collectionStateMap = next;
 		} catch (e) {
 			alert(`Failed to delete collection: ${e}`);
 		}
@@ -85,7 +91,11 @@
 		</p>
 	</div>
 
-	{#if collections.length === 0}
+	{#if loadError}
+		<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+			Failed to load collections: {loadError}
+		</div>
+	{:else if collections.length === 0}
 		<div class="rounded-lg border border-dashed border-gray-300 py-12 text-center text-sm text-gray-400">
 			Upload documents to create your first collection.
 		</div>

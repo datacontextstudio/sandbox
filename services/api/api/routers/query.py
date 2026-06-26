@@ -43,7 +43,7 @@ async def query(req: QueryRequest) -> QueryResponse:
                                     "You are a helpful assistant. Answer questions directly and concisely "
                                     "using the provided context. Do not begin your answer with phrases like "
                                     "'According to the context', 'Based on the context', or similar meta-references. "
-                                    "Just answer the question."
+                                    "Just answer the question. You may use bullet points."
                                 ),
                             },
                             {"role": "user", "content": prompt},

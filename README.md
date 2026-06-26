@@ -22,9 +22,9 @@ A self-hosted, open-source RAG (Retrieval-Augmented Generation) platform. Upload
 │                                │  LLM + Embed │  │ Vector DB │ │
 │                                │              │  │           │ │
 │                                │ ollama :11434│  │qdrant     │ │
-│                                │ ├─ LLM model │  │:6333/:6334│ │
-│                                │ └─ embed mdl │  │vol: data  │ │
-│                                │ vol: ollama  │  └───────────┘ │
+│                                │ (macOS host) │  │:6333/:6334│ │
+│                                │ ├─ LLM model │  │vol: data  │ │
+│                                │ └─ embed mdl │  └───────────┘ │
 │                                └──────────────┘                │
 │                                                                │
 │  ┌─────────────────────────────────────────────────────────┐   │
@@ -44,10 +44,10 @@ A self-hosted, open-source RAG (Retrieval-Augmented Generation) platform. Upload
 │                                                                │
 │  Notes                                                         │
 │  • All services share a single Docker bridge network           │
-│  • ollama replaces both vLLM and TEI; uses Apple Silicon MPS   │
+│  • ollama runs natively on macOS host (not in Docker)          │
+│  • Containers reach ollama via host.docker.internal:11434      │
 │  • Web app exposed via nginx on :3000 (vite dev inside)        │
 │  • API exposed via nginx on :8000 (FastAPI inside)             │
-│  • Expose ollama :11434 to host for `ollama pull` model mgmt   │
 │  • Expose qdrant :6333 to host for the Qdrant web dashboard    │
 └────────────────────────────────────────────────────────────────┘
 ```
@@ -72,9 +72,38 @@ The `architecture-vms.txt` file in this repo describes the production multi-VM l
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
-- (Apple Silicon — recommended) Native Ollama for GPU acceleration: see [tip below](#apple-silicon--gpu-acceleration)
+- [Ollama](https://ollama.com/) running natively on macOS (see [Running Ollama](#running-ollama) below)
 
-### 1. Clone and configure
+### Quickstart — use `run.sh`
+
+The easiest way to get everything running is to use the provided `run.sh` script:
+
+```bash
+git clone https://github.com/datacontextstudio/sandbox.git
+cd sandbox
+./run.sh
+```
+
+The script does the following:
+
+```bash
+cp .env.example .env
+
+brew install ollama
+brew services start ollama
+ollama pull llama3
+ollama pull nomic-embed-text
+
+# this will take a while (10-20 minutes), be patient
+docker-compose build
+docker-compose up -d
+```
+
+> **First-run warning:** The initial `docker-compose build` (or `docker-compose up`) can take **up to 30 minutes**. Docker needs to download and compile a large set of dependencies including Docling, PyTorch, and their transitive packages. Subsequent starts are fast.
+
+### Manual setup
+
+#### 1. Clone and configure
 
 ```bash
 git clone https://github.com/datacontextstudio/sandbox.git
@@ -82,45 +111,70 @@ cd sandbox
 cp .env.example .env
 ```
 
-The defaults in `.env` work out of the box with Docker Compose. Edit them if you need to point at external services.
+The defaults in `.env` work out of the box. Edit them if you need to point at external services.
 
-### 2. Start the stack
+#### 2. Start Ollama (native, outside Docker)
+
+See [Running Ollama](#running-ollama) below. Ollama must be running before you start the Docker stack.
+
+#### 3. Build and start the stack
+
+> **First-run warning:** The initial build can take **up to 30 minutes** — Docker must download and compile Docling, PyTorch, and many other large dependencies. Subsequent starts are fast.
 
 ```bash
+docker-compose build
 docker-compose up -d
 ```
 
-This starts nginx, the web app, the API, Ollama, Qdrant, Redis, and the ingestion worker.
+This starts nginx, the web app, the API, Qdrant, Redis, and the ingestion worker. Ollama runs on your Mac, not in Docker.
 
-### 3. Pull models (first time only)
-
-```bash
-docker-compose exec ollama ollama pull llama3
-docker-compose exec ollama ollama pull nomic-embed-text
-```
-
-### 4. Verify
+#### 4. Verify
 
 - Web UI: `http://localhost:3000`
 - API health check: `http://localhost:8000/healthz`
 - Qdrant dashboard: `http://localhost:6333/dashboard`
 
-### Apple Silicon / GPU Acceleration
+### Running Ollama
 
-Ollama inside Docker runs on the Linux VM and cannot access Apple Metal. For GPU-accelerated inference:
+This project is configured to run Ollama **natively on macOS**, outside of Docker. The `ollama` service block in `docker-compose.yml` is commented out by default. Ollama inside Docker Desktop runs in a Linux VM and cannot access Apple's Metal GPU, so native is both simpler and faster.
+
+**Install and start Ollama:**
 
 ```bash
 brew install ollama
-ollama serve   # run in a separate terminal
+brew services start ollama   # starts automatically on login
 ```
 
-Then in `.env`, change:
+**Pull the required models (first time only):**
+
+```bash
+ollama pull llama3
+ollama pull nomic-embed-text
+```
+
+The `.env` file points the Docker services at Ollama via `OLLAMA_BASE_URL=http://host.docker.internal:11434`.
+
+#### Running Ollama inside Docker instead
+
+If you prefer to run everything in Docker (e.g. on Linux, or without Homebrew), uncomment the following in `docker-compose.yml`:
+
+1. The `ollama` service block (lines starting with `# ollama:`)
+2. The `# - ollama` line under `depends_on` in the `api` service
+3. The `# - ollama` line under `depends_on` in the `worker` service
+4. The `# ollama_data:` line in the `volumes` section at the bottom
+
+Then change `OLLAMA_BASE_URL` in `.env` to:
 
 ```
-OLLAMA_BASE_URL=http://host.docker.internal:11434
+OLLAMA_BASE_URL=http://ollama:11434
 ```
 
-And comment out the `ollama` service in `docker-compose.yml`.
+And pull models via:
+
+```bash
+docker-compose exec ollama ollama pull llama3
+docker-compose exec ollama ollama pull nomic-embed-text
+```
 
 ## API Usage
 
@@ -197,7 +251,7 @@ All configuration is via environment variables (set in `.env`):
 
 | Variable           | Default               | Description                              |
 | ------------------ | --------------------- | ---------------------------------------- |
-| `OLLAMA_BASE_URL`  | `http://ollama:11434` | Ollama endpoint                          |
+| `OLLAMA_BASE_URL`  | `http://host.docker.internal:11434` | Ollama endpoint (native macOS host) |
 | `QDRANT_HOST`      | `qdrant`              | Qdrant hostname                          |
 | `QDRANT_PORT`      | `6333`                | Qdrant REST port                         |
 | `REDIS_URL`        | `redis://redis:6379`  | Redis connection URL                     |
