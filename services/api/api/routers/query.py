@@ -36,7 +36,18 @@ async def query(req: QueryRequest) -> QueryResponse:
                     f"{settings.ollama_base_url}/api/chat",
                     json={
                         "model": req.llm_model,
-                        "messages": [{"role": "user", "content": prompt}],
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": (
+                                    "You are a helpful assistant. Answer questions directly and concisely "
+                                    "using the provided context. Do not begin your answer with phrases like "
+                                    "'According to the context', 'Based on the context', or similar meta-references. "
+                                    "Just answer the question."
+                                ),
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
                         "stream": False,
                     },
                 )
