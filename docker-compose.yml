@@ -38,9 +38,13 @@ services:
       QDRANT_HOST: ${QDRANT_HOST:-qdrant}
       QDRANT_PORT: ${QDRANT_PORT:-6333}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      STORAGE_PATH: /data/documents
+    volumes:
+      - storage_data:/data/documents
     depends_on:
       - ollama
       - qdrant
+      - redis
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
