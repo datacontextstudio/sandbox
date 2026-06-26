@@ -1,3 +1,5 @@
+import asyncio
+
 from qdrant_client import AsyncQdrantClient
 
 from api.config import settings
@@ -29,9 +31,17 @@ async def search(collection_name: str, vector: list[float], top_k: int) -> list[
             QueryResult(
                 text=payload.get("text", ""),
                 score=point.score,
+                collection_name=collection_name,
                 file_path=payload.get("file_path"),
                 chunk_index=payload.get("chunk_index"),
                 metadata=metadata,
             )
         )
     return results
+
+
+async def search_many(collections: list[str], vector: list[float], top_k: int) -> list[QueryResult]:
+    per_collection = await asyncio.gather(*[search(c, vector, top_k) for c in collections])
+    merged = [r for results in per_collection for r in results]
+    merged.sort(key=lambda r: r.score, reverse=True)
+    return merged[:top_k]

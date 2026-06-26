@@ -30,7 +30,7 @@ class IngestResponse(BaseModel):
 
 class QueryRequest(BaseModel):
     query: str
-    collection_name: str = "default"
+    collections: list[str] = Field(default_factory=lambda: ["default"])
     top_k: int = 5
     generate: bool = False
     llm_model: str = "llama3"
@@ -39,6 +39,7 @@ class QueryRequest(BaseModel):
 class QueryResult(BaseModel):
     text: str
     score: float
+    collection_name: str = ""
     file_path: str | None = None
     chunk_index: int | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)

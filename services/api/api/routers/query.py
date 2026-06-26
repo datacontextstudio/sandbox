@@ -3,7 +3,8 @@ from fastapi import APIRouter, HTTPException
 
 from api.config import settings
 from api.models import QueryRequest, QueryResponse
-from api.services import embedder, searcher
+from api.services import embedder
+from api.services.searcher import search_many
 
 router = APIRouter()
 
@@ -16,7 +17,7 @@ async def query(req: QueryRequest) -> QueryResponse:
         raise HTTPException(status_code=502, detail=f"Embedding service error: {exc}")
 
     try:
-        results = await searcher.search(req.collection_name, vector, req.top_k)
+        results = await search_many(req.collections, vector, req.top_k)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Search error: {exc}")
 
