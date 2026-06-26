@@ -55,3 +55,7 @@ class JobStatusResponse(BaseModel):
     job_id: str
     status: str
     fields: dict[str, str] = Field(default_factory=dict)
+
+
+class CollectionsResponse(BaseModel):
+    collections: list[str]
