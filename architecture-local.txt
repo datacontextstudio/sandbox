@@ -1,0 +1,45 @@
+┌───────────────────────────────────────────────────────────────┐
+│            docker-compose  (local MacBook dev)                │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │                    Public Layer                         │  │
+│  │          nginx (reverse proxy)  host: :80               │  │
+│  └──────────────────────────┬──────────────────────────────┘  │
+│                             │                                 │
+│  ┌──────────────────────────▼──────────────────────────────┐  │
+│  │                    API Layer                            │  │
+│  │             api  (FastAPI)  :8000                       │  │
+│  └─────────────┬───────────────────────────────┬───────────┘  │
+│                │                               │              │
+│  ┌─────────────▼──────────────┐  ┌─────────────▼───────────┐  │
+│  │  LLM + Embedding Layer     │  │    Vector DB Layer      │  │
+│  │                            │  │                         │  │
+│  │  ollama  :11434            │  │  qdrant  :6333/:6334    │  │
+│  │  ├─ LLM model              │  │  volume: qdrant_data    │  │
+│  │  └─ embed model            │  │                         │  │
+│  │  volume: ollama_data       │  └─────────────────────────┘  │
+│  └────────────────────────────┘                               │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │                  Ingestion Layer                        │  │
+│  │                                                         │  │
+│  │  redis :6379 ──► worker (ingestion container)           │  │
+│  │                    ├── Parse documents (Docling)        │  │
+│  │                    ├── Chunk documents                  │  │
+│  │                    ├── Embed  (→ ollama)                │  │
+│  │                    └── Index  (→ qdrant)                │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │                  Storage Layer                          │  │
+│  │         volume: storage_data  (raw documents)           │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                                                               │
+│  Notes                                                        │
+│  • All services share a single Docker bridge network          │
+│  • ollama replaces both vLLM and TEI; uses Apple Silicon MPS  │
+│  • Expose ollama :11434 to host for `ollama pull` model mgmt  │
+│  • Expose qdrant :6333 to host for the Qdrant web dashboard   │
+│  • nginx is optional for local dev; api :8000 can be exposed  │
+│    directly to the host instead                               │
+└───────────────────────────────────────────────────────────────┘
