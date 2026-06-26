@@ -8,7 +8,7 @@
 	let selectedCollections = $state(new Set<string>());
 	let queryText = $state('');
 	let topK = $state(5);
-	let generate = $state(false);
+	let generate = $state(true);
 	let llmModel = $state('llama3');
 
 	let isLoading = $state(false);
@@ -16,6 +16,22 @@
 	let answer = $state<string | null>(null);
 	let results = $state<QueryResult[]>([]);
 	let hasSearched = $state(false);
+
+	let lastQueryCurl = $state<string | null>(null);
+	let activeTab = $state<'query' | 'api'>('query');
+	let copied = $state(false);
+
+	async function copyToClipboard() {
+		if (!lastQueryCurl) return;
+		await navigator.clipboard.writeText(lastQueryCurl);
+		copied = true;
+		setTimeout(() => (copied = false), 2000);
+	}
+
+	function buildCurl(req: { query: string; collections: string[]; top_k: number; generate: boolean; llm_model: string }): string {
+		const body = JSON.stringify(req, null, 2);
+		return `curl -X POST http://localhost:8000/query \\\n  -H "Content-Type: application/json" \\\n  -d '${body}'`;
+	}
 
 	let canSubmit = $derived(queryText.trim().length > 0 && selectedCollections.size > 0 && !isLoading);
 
@@ -43,16 +59,21 @@
 		queryError = null;
 		answer = null;
 		results = [];
+		lastQueryCurl = null;
 		hasSearched = true;
+		activeTab = 'query';
+
+		const req = {
+			query: queryText,
+			collections: [...selectedCollections],
+			top_k: topK,
+			generate,
+			llm_model: llmModel
+		};
+		lastQueryCurl = buildCurl(req);
 
 		try {
-			const resp = await queryCollections({
-				query: queryText,
-				collections: [...selectedCollections],
-				top_k: topK,
-				generate,
-				llm_model: llmModel
-			});
+			const resp = await queryCollections(req);
 			answer = resp.answer;
 			results = resp.results;
 		} catch (e) {
@@ -177,49 +198,112 @@
 		</div>
 	</div>
 
-	<!-- Results -->
-	{#if queryError}
-		<div class="rounded-xl border border-red-200 bg-red-50 px-5 py-4">
-			<p class="text-sm font-medium text-red-700">Error</p>
-			<p class="text-sm text-red-600 mt-1">{queryError}</p>
-		</div>
-	{/if}
+	<!-- Results tabs -->
+	{#if hasSearched}
+		<div>
+			<!-- Tab bar -->
+			<div class="flex border-b border-gray-200">
+				<button
+					onclick={() => (activeTab = 'query')}
+					class="px-4 py-2 text-sm font-medium transition-colors -mb-px border-b-2"
+					class:border-gray-900={activeTab === 'query'}
+					class:text-gray-900={activeTab === 'query'}
+					class:border-transparent={activeTab !== 'query'}
+					class:text-gray-500={activeTab !== 'query'}
+					class:hover:text-gray-700={activeTab !== 'query'}
+				>
+					Query
+				</button>
+				<button
+					onclick={() => (activeTab = 'api')}
+					class="px-4 py-2 text-sm font-medium transition-colors -mb-px border-b-2"
+					class:border-gray-900={activeTab === 'api'}
+					class:text-gray-900={activeTab === 'api'}
+					class:border-transparent={activeTab !== 'api'}
+					class:text-gray-500={activeTab !== 'api'}
+					class:hover:text-gray-700={activeTab !== 'api'}
+				>
+					API Call
+				</button>
+			</div>
 
-	{#if answer}
-		<div class="rounded-xl border border-amber-200 bg-amber-50 p-5">
-			<h3 class="text-sm font-semibold text-amber-900 mb-2">AI Answer</h3>
-			<p class="text-sm text-amber-800 whitespace-pre-wrap leading-relaxed">{answer}</p>
-		</div>
-	{/if}
+			<!-- Query tab panel -->
+			{#if activeTab === 'query'}
+				<div class="space-y-4 pt-4">
+					{#if queryError}
+						<div class="rounded-xl border border-red-200 bg-red-50 px-5 py-4">
+							<p class="text-sm font-medium text-red-700">Error</p>
+							<p class="text-sm text-red-600 mt-1">{queryError}</p>
+						</div>
+					{/if}
 
-	{#if results.length > 0}
-		<div class="space-y-3">
-			<h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-				{results.length} result{results.length !== 1 ? 's' : ''}
-			</h2>
-			{#each results as result, i}
-				<div class="bg-white rounded-xl border border-gray-200 p-5">
-					<div class="flex items-center gap-2 mb-3">
-						<span class="text-xs font-medium text-gray-400">#{i + 1}</span>
-						<span
-							class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800"
-						>
-							{result.collection_name}
-						</span>
-						<span class="ml-auto text-sm font-semibold text-green-700">
-							{(result.score * 100).toFixed(1)}%
-						</span>
-					</div>
-					<p class="text-sm text-gray-800 leading-relaxed line-clamp-4">{result.text}</p>
-					{#if result.file_path}
-						<p class="mt-2 text-xs font-mono text-gray-400 truncate">{result.file_path}</p>
+					{#if answer}
+						<div class="rounded-xl border border-amber-200 bg-amber-50 p-5">
+							<h3 class="text-sm font-semibold text-amber-900 mb-2">AI Answer</h3>
+							<p class="text-sm text-amber-800 whitespace-pre-wrap leading-relaxed">{answer}</p>
+						</div>
+					{/if}
+
+					{#if results.length > 0}
+						<div class="space-y-3">
+							<h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+								{results.length} result{results.length !== 1 ? 's' : ''}
+							</h2>
+							{#each results as result, i}
+								<div class="bg-white rounded-xl border border-gray-200 p-5">
+									<div class="flex items-center gap-2 mb-3">
+										<span class="text-xs font-medium text-gray-400">#{i + 1}</span>
+										<span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+											{result.collection_name}
+										</span>
+										<span class="ml-auto text-sm font-semibold text-green-700">
+											{(result.score * 100).toFixed(1)}%
+										</span>
+									</div>
+									<p class="text-sm text-gray-800 leading-relaxed line-clamp-4">{result.text}</p>
+									{#if result.file_path}
+										<p class="mt-2 text-xs font-mono text-gray-400 truncate">{result.file_path}</p>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{:else if !isLoading && !queryError}
+						<div class="rounded-xl border border-gray-200 bg-white px-5 py-8 text-center">
+							<p class="text-sm text-gray-400">No results found for this query.</p>
+						</div>
 					{/if}
 				</div>
-			{/each}
-		</div>
-	{:else if hasSearched && !isLoading && !queryError}
-		<div class="rounded-xl border border-gray-200 bg-white px-5 py-8 text-center">
-			<p class="text-sm text-gray-400">No results found for this query.</p>
+			{/if}
+
+			<!-- API Call tab panel -->
+			{#if activeTab === 'api'}
+				<div class="pt-4">
+					<div class="rounded-xl border border-gray-700 bg-gray-900 p-5">
+						<div class="flex items-center justify-between mb-3">
+							<h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wide">API Call</h3>
+							<button
+								onclick={copyToClipboard}
+								class="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+								title="Copy to clipboard"
+							>
+								{#if copied}
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+										<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+									</svg>
+									<span class="text-green-400">Copied!</span>
+								{:else}
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+										<path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+										<path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+									</svg>
+									<span>Copy</span>
+								{/if}
+							</button>
+						</div>
+						<pre class="text-xs text-green-400 font-mono whitespace-pre-wrap break-all leading-relaxed">{lastQueryCurl}</pre>
+					</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>
