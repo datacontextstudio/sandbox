@@ -2,6 +2,10 @@
 
 A self-hosted, open-source RAG (Retrieval-Augmented Generation) platform. Upload documents, have them automatically parsed, chunked, and embedded into a vector database, then query them with semantic search and optional LLM-generated answers — all running on your own infrastructure.
 
+## Demo
+
+[Watch a 3-minute walkthrough on YouTube](https://www.youtube.com/watch?v=GsPmb05vRUs)
+
 ## Architecture
 
 ```
