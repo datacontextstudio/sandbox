@@ -1,3 +1,5 @@
+cp .env.example .env
+
 brew install ollama
 brew services start ollama
 ollama pull llama3
