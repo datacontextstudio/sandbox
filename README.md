@@ -2,9 +2,12 @@
 
 A self-hosted, open-source RAG (Retrieval-Augmented Generation) platform. Upload documents, have them automatically parsed, chunked, and embedded into a vector database, then query them with semantic search and optional LLM-generated answers — all running on your own infrastructure.
 
-## Demo
+## Demos
 
-[Watch a 3-minute walkthrough on YouTube](https://www.youtube.com/watch?v=GsPmb05vRUs)
+| Title                                                    | Length | URL                                         |
+| -------------------------------------------------------- | ------ | ------------------------------------------- |
+| Indexing documents, running queries and making API calls | 3:47   | https://www.youtube.com/watch?v=GsPmb05vRUs |
+| Using the LLM style interface                            | 2:24   | https://www.youtube.com/watch?v=ObyvFaTHk6I |
 
 ## Architecture
 
@@ -17,21 +20,21 @@ A self-hosted, open-source RAG (Retrieval-Augmented Generation) platform. Upload
 │  │  nginx  :3000→web+api  |  :3001→chat+api  |  :8000→api only  │   │
 │  └──────┬───────────────────────────┬─────────────┬─────────────┘   │
 │         │                           │             │                 │
-│  ┌──────▼──────────┐  ┌─────────────▼──────┐  ┌──▼──────────────┐  │
+│  ┌──────▼──────────┐  ┌─────────────▼───────┐  ┌──▼──────────────┐  │
 │  │ Frontend Layer  │  │   Chat Layer        │  │   API Layer     │  │
 │  │ web (SvelteKit) │  │  chat (SvelteKit)   │  │ api (FastAPI)   │  │
 │  │ vite dev :5173  │  │  vite dev :5174     │  │ :8000           │  │
-│  └─────────────────┘  └────────────────────┘  │                 │  │
-│                                               │ internal-api    │  │
-│                                               │ (FastAPI) :8001 │  │
-│                                               └──┬──────────┬───┘  │
-│                                   ┌──────────────▼──┐  ┌────▼────┐ │
-│                                   │  LLM + Embed    │  │ Vector  │ │
-│                                   │  ollama :11434  │  │   DB    │ │
-│                                   │  (macOS host)   │  │ qdrant  │ │
-│                                   │  ├─ LLM model   │  │  :6333  │ │
-│                                   │  └─ embed mdl   │  └─────────┘ │
-│                                   └─────────────────┘              │
+│  └─────────────────┘  └─────────────────────┘  │                 │  │
+│                                                │ internal-api    │  │
+│                                                │ (FastAPI) :8001 │  │
+│                                                └──┬──────────┬───┘  │
+│                                   ┌───────────────▼──┐  ┌────▼────┐ │
+│                                   │  LLM + Embed     │  │ Vector  │ │
+│                                   │  ollama :11434   │  │   DB    │ │
+│                                   │  (macOS host)    │  │ qdrant  │ │
+│                                   │  ├─ LLM model    │  │  :6333  │ │
+│                                   │  └─ embed mdl    │  └─────────┘ │
+│                                   └──────────────────┘              │
 │                                                                     │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │                     Ingestion Layer                          │   │
@@ -62,19 +65,19 @@ The `architecture-vms.txt` file in this repo describes the production multi-VM l
 
 ## Tech Stack
 
-| Component        | Technology                                                              |
-| ---------------- | ----------------------------------------------------------------------- |
-| Frontend         | [SvelteKit 5](https://svelte.dev/docs/kit) + Tailwind CSS 4             |
-| Chat Frontend    | SvelteKit 5 + Tailwind CSS 4 (chatbot UI, `services/chat`)              |
-| API              | [FastAPI](https://fastapi.tiangolo.com/) + Uvicorn                      |
-| Internal API     | FastAPI + SQLAlchemy 2.0 (chat session storage, `services/internal-api`)|
-| Document parsing | [Docling](https://github.com/DS4SD/docling) (PDF, DOCX, PPTX, and more) |
-| LLM + Embeddings | [Ollama](https://ollama.com/)                                           |
-| Vector database  | [Qdrant](https://qdrant.tech/)                                          |
-| Relational DB    | PostgreSQL 16 (chat sessions & message history)                         |
-| Task queue       | [Redis](https://redis.io/)                                              |
-| Reverse proxy    | Nginx                                                                   |
-| Containerization | Docker + Docker Compose                                                 |
+| Component        | Technology                                                               |
+| ---------------- | ------------------------------------------------------------------------ |
+| Frontend         | [SvelteKit 5](https://svelte.dev/docs/kit) + Tailwind CSS 4              |
+| Chat Frontend    | SvelteKit 5 + Tailwind CSS 4 (chatbot UI, `services/chat`)               |
+| API              | [FastAPI](https://fastapi.tiangolo.com/) + Uvicorn                       |
+| Internal API     | FastAPI + SQLAlchemy 2.0 (chat session storage, `services/internal-api`) |
+| Document parsing | [Docling](https://github.com/DS4SD/docling) (PDF, DOCX, PPTX, and more)  |
+| LLM + Embeddings | [Ollama](https://ollama.com/)                                            |
+| Vector database  | [Qdrant](https://qdrant.tech/)                                           |
+| Relational DB    | PostgreSQL 16 (chat sessions & message history)                          |
+| Task queue       | [Redis](https://redis.io/)                                               |
+| Reverse proxy    | Nginx                                                                    |
+| Containerization | Docker + Docker Compose                                                  |
 
 ## Getting Started
 
@@ -82,6 +85,7 @@ The `architecture-vms.txt` file in this repo describes the production multi-VM l
 
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
 - [Ollama](https://ollama.com/) running natively on macOS (see [Running Ollama](#running-ollama) below)
+- [Homebrew](https://brew.sh/) to install packages if running Ollama natively
 
 ### Quickstart — use `run.sh`
 
@@ -187,6 +191,28 @@ docker-compose exec ollama ollama pull llama3
 docker-compose exec ollama ollama pull nomic-embed-text
 ```
 
+## Exposed URLs
+
+All URLs available on `localhost` after `docker-compose up -d`:
+
+| URL                                   | Service                | Description                                         |
+| ------------------------------------- | ---------------------- | --------------------------------------------------- |
+| `http://localhost:3000`               | Web app                | Document upload, search, and collection management  |
+| `http://localhost:3000/api/`          | Main API (proxied)     | FastAPI — ingest, query, jobs, collections          |
+| `http://localhost:3000/internal-api/` | Internal API (proxied) | Chat session & message API                          |
+| `http://localhost:3001`               | Chat app               | LLM chatbot interface                               |
+| `http://localhost:3001/api/`          | Main API (proxied)     | Same FastAPI, served from the chat port             |
+| `http://localhost:3001/internal-api/` | Internal API (proxied) | Same internal API, served from the chat port        |
+| `http://localhost:8000`               | Main API (direct)      | FastAPI without nginx in the path                   |
+| `http://localhost:8000/docs`          | Main API docs          | Swagger / OpenAPI UI                                |
+| `http://localhost:8000/healthz`       | Main API health        | Returns `{"status": "ok"}`                          |
+| `http://localhost:6333`               | Qdrant REST            | Vector DB REST API                                  |
+| `http://localhost:6333/dashboard`     | Qdrant dashboard       | Web UI for browsing collections and running queries |
+| `localhost:6334`                      | Qdrant gRPC            | gRPC API (TCP, not HTTP)                            |
+| `localhost:6379`                      | Redis                  | Task queue (TCP, not HTTP)                          |
+
+> The `/api/` and `/internal-api/` paths are available on both `:3000` and `:3001` so that browser-side code in each app can call APIs without cross-origin requests.
+
 ## API Usage
 
 ### Ingest a document
@@ -260,22 +286,22 @@ Response includes a `results` array (text, score, metadata) and an optional `ans
 
 All configuration is via environment variables (set in `.env`):
 
-| Variable           | Default               | Description                              |
-| ------------------ | --------------------- | ---------------------------------------- |
-| `OLLAMA_BASE_URL`  | `http://host.docker.internal:11434` | Ollama endpoint (native macOS host) |
-| `QDRANT_HOST`      | `qdrant`              | Qdrant hostname                          |
-| `QDRANT_PORT`      | `6333`                | Qdrant REST port                         |
-| `REDIS_URL`        | `redis://redis:6379`  | Redis connection URL                     |
-| `STORAGE_PATH`     | `/data/storage`       | Raw document storage path                |
-| `EMBED_MODEL`      | `nomic-embed-text`    | Ollama model used for embeddings         |
-| `CHUNK_SIZE`       | `512`                 | Token target for text chunks             |
-| `CHUNK_OVERLAP`    | `64`                  | Token overlap between adjacent chunks    |
-| `EMBED_BATCH_SIZE` | `32`                  | Chunks per embedding request             |
-| `MAX_RETRIES`      | `3`                   | Worker retry attempts before dead-letter |
-| `POSTGRES_DB`      | `datacontext`         | PostgreSQL database name                 |
-| `POSTGRES_USER`    | `dcs`                 | PostgreSQL user                          |
-| `POSTGRES_PASSWORD`| `dcs_password`        | PostgreSQL password                      |
-| `DATABASE_URL`     | `postgresql+asyncpg://dcs:dcs_password@postgres:5432/datacontext` | Async connection string for internal-api |
+| Variable            | Default                                                           | Description                              |
+| ------------------- | ----------------------------------------------------------------- | ---------------------------------------- |
+| `OLLAMA_BASE_URL`   | `http://host.docker.internal:11434`                               | Ollama endpoint (native macOS host)      |
+| `QDRANT_HOST`       | `qdrant`                                                          | Qdrant hostname                          |
+| `QDRANT_PORT`       | `6333`                                                            | Qdrant REST port                         |
+| `REDIS_URL`         | `redis://redis:6379`                                              | Redis connection URL                     |
+| `STORAGE_PATH`      | `/data/storage`                                                   | Raw document storage path                |
+| `EMBED_MODEL`       | `nomic-embed-text`                                                | Ollama model used for embeddings         |
+| `CHUNK_SIZE`        | `512`                                                             | Token target for text chunks             |
+| `CHUNK_OVERLAP`     | `64`                                                              | Token overlap between adjacent chunks    |
+| `EMBED_BATCH_SIZE`  | `32`                                                              | Chunks per embedding request             |
+| `MAX_RETRIES`       | `3`                                                               | Worker retry attempts before dead-letter |
+| `POSTGRES_DB`       | `datacontext`                                                     | PostgreSQL database name                 |
+| `POSTGRES_USER`     | `dcs`                                                             | PostgreSQL user                          |
+| `POSTGRES_PASSWORD` | `dcs_password`                                                    | PostgreSQL password                      |
+| `DATABASE_URL`      | `postgresql+asyncpg://dcs:dcs_password@postgres:5432/datacontext` | Async connection string for internal-api |
 
 ## Project Structure
 
