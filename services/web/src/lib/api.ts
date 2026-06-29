@@ -1,4 +1,11 @@
 const BASE = '/api';
+const INTERNAL_BASE = '/internal-api';
+
+export interface ChatSession {
+	id: string;
+	collections: string[];
+	created_at: string;
+}
 
 export interface CollectionsResponse {
 	collections: string[];
@@ -115,4 +122,13 @@ export async function deleteDocument(collectionName: string, jobId: string): Pro
 export async function deleteCollection(name: string): Promise<DeleteResponse> {
 	const res = await fetch(`${BASE}/collections/${encodeURIComponent(name)}`, { method: 'DELETE' });
 	return handleResponse<DeleteResponse>(res);
+}
+
+export async function createChatSession(collections: string[]): Promise<ChatSession> {
+	const res = await fetch(`${INTERNAL_BASE}/sessions`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ collections })
+	});
+	return handleResponse<ChatSession>(res);
 }

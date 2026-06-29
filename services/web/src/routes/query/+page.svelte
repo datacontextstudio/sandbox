@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { QueryResult } from '$lib/api.js';
-	import { queryCollections } from '$lib/api.js';
+	import { queryCollections, createChatSession } from '$lib/api.js';
 
 	let { data }: { data: PageData } = $props();
 
@@ -21,6 +21,23 @@
 	let lastQueryCurl = $state<string | null>(null);
 	let activeTab = $state<'query' | 'api'>('query');
 	let copied = $state(false);
+
+	let isCreatingChatbot = $state(false);
+	let chatbotError = $state<string | null>(null);
+
+	async function createChatbot() {
+		if (selectedCollections.size === 0 || isCreatingChatbot) return;
+		isCreatingChatbot = true;
+		chatbotError = null;
+		try {
+			const session = await createChatSession([...selectedCollections]);
+			window.open(`http://localhost:3001/${session.id}`, '_blank');
+		} catch (e) {
+			chatbotError = String(e);
+		} finally {
+			isCreatingChatbot = false;
+		}
+	}
 
 	async function copyToClipboard() {
 		if (!lastQueryCurl) return;
@@ -135,6 +152,29 @@
 			</div>
 		{/if}
 	</div>
+
+	<!-- Create chat bot -->
+	{#if selectedCollections.size > 0}
+		<div class="flex items-center gap-3">
+			<button
+				onclick={createChatbot}
+				disabled={isCreatingChatbot}
+				class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-40 hover:bg-blue-700"
+			>
+				{#if isCreatingChatbot}
+					<span class="flex items-center gap-2">
+						<span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+						Creating…
+					</span>
+				{:else}
+					Create a chat bot
+				{/if}
+			</button>
+			{#if chatbotError}
+				<p class="text-sm text-red-600">{chatbotError}</p>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Query form -->
 	<div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
