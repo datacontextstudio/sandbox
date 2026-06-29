@@ -76,3 +76,12 @@ class DocumentsResponse(BaseModel):
 class DeleteResponse(BaseModel):
     deleted: bool
     detail: str
+
+
+class TitleRequest(BaseModel):
+    query: str
+    llm_model: str = "llama3"
+
+
+class TitleResponse(BaseModel):
+    title: str

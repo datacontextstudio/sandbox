@@ -22,19 +22,31 @@ class ChatbotSession(Base):
     collections = Column(ARRAY(String), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=text("NOW()"))
 
-    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+    chats = relationship("Chat", back_populates="session", cascade="all, delete-orphan")
+
+
+class Chat(Base):
+    __tablename__ = "chats"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(UUID(as_uuid=True), ForeignKey("chatbot_sessions.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=text("NOW()"))
+
+    session = relationship("ChatbotSession", back_populates="chats")
+    messages = relationship("ChatMessage", back_populates="chat", cascade="all, delete-orphan")
 
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    session_id = Column(UUID(as_uuid=True), ForeignKey("chatbot_sessions.id", ondelete="CASCADE"), nullable=False)
+    chat_id = Column(UUID(as_uuid=True), ForeignKey("chats.id", ondelete="CASCADE"), nullable=False)
     role = Column(String(10), nullable=False)
     content = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=text("NOW()"))
 
-    session = relationship("ChatbotSession", back_populates="messages")
+    chat = relationship("Chat", back_populates="messages")
 
 
 async def create_tables() -> None:
