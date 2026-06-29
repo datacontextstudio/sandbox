@@ -124,6 +124,14 @@ export async function deleteCollection(name: string): Promise<DeleteResponse> {
 	return handleResponse<DeleteResponse>(res);
 }
 
+export async function findChatSession(collections: string[]): Promise<ChatSession | null> {
+	const params = new URLSearchParams();
+	collections.forEach((c) => params.append('collections', c));
+	const res = await fetch(`${INTERNAL_BASE}/sessions?${params}`);
+	if (!res.ok) return null;
+	return res.json() as Promise<ChatSession | null>;
+}
+
 export async function createChatSession(collections: string[]): Promise<ChatSession> {
 	const res = await fetch(`${INTERNAL_BASE}/sessions`, {
 		method: 'POST',

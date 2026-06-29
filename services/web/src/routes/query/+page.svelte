@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { QueryResult } from '$lib/api.js';
-	import { queryCollections, createChatSession } from '$lib/api.js';
+	import { queryCollections, createChatSession, findChatSession } from '$lib/api.js';
 
 	let { data }: { data: PageData } = $props();
 
@@ -22,20 +22,22 @@
 	let activeTab = $state<'query' | 'api'>('query');
 	let copied = $state(false);
 
-	let isCreatingChatbot = $state(false);
-	let chatbotError = $state<string | null>(null);
+	let isStartingChat = $state(false);
+	let chatError = $state<string | null>(null);
 
-	async function createChatbot() {
-		if (selectedCollections.size === 0 || isCreatingChatbot) return;
-		isCreatingChatbot = true;
-		chatbotError = null;
+	async function startChat() {
+		if (selectedCollections.size === 0 || isStartingChat) return;
+		isStartingChat = true;
+		chatError = null;
 		try {
-			const session = await createChatSession([...selectedCollections]);
-			window.open(`http://localhost:3001/${session.id}`, '_blank');
+			const cols = [...selectedCollections].sort();
+			const existing = await findChatSession(cols);
+			const sessionId = existing ? existing.id : (await createChatSession(cols)).id;
+			window.open(`http://localhost:3001/${sessionId}`, '_blank');
 		} catch (e) {
-			chatbotError = String(e);
+			chatError = String(e);
 		} finally {
-			isCreatingChatbot = false;
+			isStartingChat = false;
 		}
 	}
 
@@ -153,25 +155,25 @@
 		{/if}
 	</div>
 
-	<!-- Create chat bot -->
+	<!-- Start chat -->
 	{#if selectedCollections.size > 0}
 		<div class="flex items-center gap-3">
 			<button
-				onclick={createChatbot}
-				disabled={isCreatingChatbot}
+				onclick={startChat}
+				disabled={isStartingChat}
 				class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-opacity disabled:opacity-40 hover:bg-blue-700"
 			>
-				{#if isCreatingChatbot}
+				{#if isStartingChat}
 					<span class="flex items-center gap-2">
 						<span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
-						Creating…
+						Starting…
 					</span>
 				{:else}
-					Create a chat bot
+					Start chat
 				{/if}
 			</button>
-			{#if chatbotError}
-				<p class="text-sm text-red-600">{chatbotError}</p>
+			{#if chatError}
+				<p class="text-sm text-red-600">{chatError}</p>
 			{/if}
 		</div>
 	{/if}
