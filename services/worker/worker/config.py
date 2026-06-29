@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     qdrant_port: int = 6333
     storage_path: str = "/data/documents"
     embed_model: str = "nomic-embed-text"
-    chunk_size: int = 1500
-    chunk_overlap: int = 150
+    chunk_size: int = 4000
+    chunk_overlap: int = 400
     max_retries: int = 3
     embed_batch_size: int = 32
     health_port: int = 8080
