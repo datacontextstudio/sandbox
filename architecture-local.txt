@@ -1,45 +1,48 @@
-┌────────────────────────────────────────────────────────────────┐
-│            docker-compose  (local MacBook dev)                 │
-│                                                                │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                    Public Layer                         │   │
-│  │  nginx (reverse proxy)  :3000 → web  |  :8000 → api     │   │
-│  └──────┬──────────────────────────────────────┬───────────┘   │
-│         │                                      │               │
-│  ┌──────▼──────────────────────┐  ┌────────────▼────────────┐  │
-│  │      Frontend Layer         │  │       API Layer         │  │
-│  │  web  (SvelteKit)           │  │  api  (FastAPI)  :8000  │  │
-│  │  vite dev  :5173            │  └────────┬──────────┬─────┘  │
-│  └─────────────────────────────┘           │          │        │
-│                                ┌───────────▼──┐  ┌────▼──────┐ │
-│                                │  LLM + Embed │  │ Vector DB │ │
-│                                │              │  │           │ │
-│                                │ ollama :11434│  │qdrant     │ │
-│                                │ ├─ LLM model │  │:6333/:6334│ │
-│                                │ └─ embed mdl │  │vol: data  │ │
-│                                │ vol: ollama  │  └───────────┘ │
-│                                └──────────────┘                │
-│                                                                │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                  Ingestion Layer                        │   │
-│  │                                                         │   │
-│  │  redis :6379 ──► worker (ingestion container)           │   │
-│  │                    ├── Parse documents (Docling)        │   │
-│  │                    ├── Chunk documents                  │   │
-│  │                    ├── Embed  (→ ollama)                │   │
-│  │                    └── Index  (→ qdrant)                │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                  Storage Layer                          │   │
-│  │         volume: storage_data  (raw documents)           │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                │
-│  Notes                                                         │
-│  • All services share a single Docker bridge network           │
-│  • ollama replaces both vLLM and TEI; uses Apple Silicon MPS   │
-│  • Web app exposed via nginx on :3000 (vite dev inside)        │
-│  • API exposed via nginx on :8000 (FastAPI inside)             │
-│  • Expose ollama :11434 to host for `ollama pull` model mgmt   │
-│  • Expose qdrant :6333 to host for the Qdrant web dashboard    │
-└────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│               docker-compose  (local MacBook dev)                   │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │                       Public Layer                           │   │
+│  │  nginx  :3000→web+api  |  :3001→chat+api  |  :8000→api only  │   │
+│  └──────┬───────────────────────────┬─────────────┬─────────────┘   │
+│         │                           │             │                 │
+│  ┌──────▼──────────┐  ┌─────────────▼───────┐  ┌──▼──────────────┐  │
+│  │ Frontend Layer  │  │   Chat Layer        │  │   API Layer     │  │
+│  │ web (SvelteKit) │  │  chat (SvelteKit)   │  │ api (FastAPI)   │  │
+│  │ vite dev :5173  │  │  vite dev :5174     │  │ :8000           │  │
+│  └─────────────────┘  └─────────────────────┘  │                 │  │
+│                                                │ internal-api    │  │
+│                                                │ (FastAPI) :8001 │  │
+│                                                └──┬──────────┬───┘  │
+│                                   ┌───────────────▼──┐  ┌────▼────┐ │
+│                                   │  LLM + Embed     │  │ Vector  │ │
+│                                   │  ollama :11434   │  │   DB    │ │
+│                                   │  ├─ LLM model    │  │ qdrant  │ │
+│                                   │  └─ embed mdl    │  │  :6333  │ │
+│                                   │  vol: ollama     │  └─────────┘ │
+│                                   └──────────────────┘              │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │                     Ingestion Layer                          │   │
+│  │                                                              │   │
+│  │  redis :6379 ──► worker (ingestion container)                │   │
+│  │                    ├── Parse documents (Docling)             │   │
+│  │                    ├── Chunk documents                       │   │
+│  │                    ├── Embed  (→ ollama)                     │   │
+│  │                    └── Index  (→ qdrant)                     │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │                      Storage Layer                           │   │
+│  │  volume: storage_data  (raw documents)                       │   │
+│  │  postgres :5432  vol: postgres_data  (chat sessions/msgs)    │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  Notes                                                              │
+│  • All services share a single Docker bridge network                │
+│  • ollama replaces both vLLM and TEI; uses Apple Silicon MPS        │
+│  • Web app on :3000, chat app on :3001 (both via nginx)             │
+│  • internal-api (FastAPI :8001) stores chat history in PostgreSQL   │
+│  • Expose ollama :11434 to host for `ollama pull` model mgmt        │
+│  • Expose qdrant :6333 to host for the Qdrant web dashboard         │
+└─────────────────────────────────────────────────────────────────────┘

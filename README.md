@@ -9,51 +9,53 @@ A self-hosted, open-source RAG (Retrieval-Augmented Generation) platform. Upload
 ## Architecture
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│            docker-compose  (local MacBook dev)                 │
-│                                                                │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                    Public Layer                         │   │
-│  │  nginx (reverse proxy)  :3000 → web  |  :8000 → api     │   │
-│  └──────┬──────────────────────────────────────┬───────────┘   │
-│         │                                      │               │
-│  ┌──────▼──────────────────────┐  ┌────────────▼────────────┐  │
-│  │      Frontend Layer         │  │       API Layer         │  │
-│  │  web  (SvelteKit)           │  │  api  (FastAPI)  :8000  │  │
-│  │  vite dev  :5173            │  └────────┬──────────┬─────┘  │
-│  └─────────────────────────────┘           │          │        │
-│                                ┌───────────▼──┐  ┌────▼──────┐ │
-│                                │  LLM + Embed │  │ Vector DB │ │
-│                                │              │  │           │ │
-│                                │ ollama :11434│  │qdrant     │ │
-│                                │ (macOS host) │  │:6333/:6334│ │
-│                                │ ├─ LLM model │  │vol: data  │ │
-│                                │ └─ embed mdl │  └───────────┘ │
-│                                └──────────────┘                │
-│                                                                │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                  Ingestion Layer                        │   │
-│  │                                                         │   │
-│  │  redis :6379 ──► worker (ingestion container)           │   │
-│  │                    ├── Parse documents (Docling)        │   │
-│  │                    ├── Chunk documents                  │   │
-│  │                    ├── Embed  (→ ollama)                │   │
-│  │                    └── Index  (→ qdrant)                │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                  Storage Layer                          │   │
-│  │         volume: storage_data  (raw documents)           │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                │
-│  Notes                                                         │
-│  • All services share a single Docker bridge network           │
-│  • ollama runs natively on macOS host (not in Docker)          │
-│  • Containers reach ollama via host.docker.internal:11434      │
-│  • Web app exposed via nginx on :3000 (vite dev inside)        │
-│  • API exposed via nginx on :8000 (FastAPI inside)             │
-│  • Expose qdrant :6333 to host for the Qdrant web dashboard    │
-└────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│               docker-compose  (local MacBook dev)                   │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │                       Public Layer                           │   │
+│  │  nginx  :3000→web+api  |  :3001→chat+api  |  :8000→api only  │   │
+│  └──────┬───────────────────────────┬─────────────┬─────────────┘   │
+│         │                           │             │                 │
+│  ┌──────▼──────────┐  ┌─────────────▼──────┐  ┌──▼──────────────┐  │
+│  │ Frontend Layer  │  │   Chat Layer        │  │   API Layer     │  │
+│  │ web (SvelteKit) │  │  chat (SvelteKit)   │  │ api (FastAPI)   │  │
+│  │ vite dev :5173  │  │  vite dev :5174     │  │ :8000           │  │
+│  └─────────────────┘  └────────────────────┘  │                 │  │
+│                                               │ internal-api    │  │
+│                                               │ (FastAPI) :8001 │  │
+│                                               └──┬──────────┬───┘  │
+│                                   ┌──────────────▼──┐  ┌────▼────┐ │
+│                                   │  LLM + Embed    │  │ Vector  │ │
+│                                   │  ollama :11434  │  │   DB    │ │
+│                                   │  (macOS host)   │  │ qdrant  │ │
+│                                   │  ├─ LLM model   │  │  :6333  │ │
+│                                   │  └─ embed mdl   │  └─────────┘ │
+│                                   └─────────────────┘              │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │                     Ingestion Layer                          │   │
+│  │  redis :6379 ──► worker (ingestion container)                │   │
+│  │                    ├── Parse documents (Docling)             │   │
+│  │                    ├── Chunk documents                       │   │
+│  │                    ├── Embed  (→ ollama)                     │   │
+│  │                    └── Index  (→ qdrant)                     │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │                      Storage Layer                           │   │
+│  │  volume: storage_data  (raw documents)                       │   │
+│  │  postgres :5432  vol: postgres_data  (chat sessions/msgs)    │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  Notes                                                              │
+│  • All services share a single Docker bridge network                │
+│  • ollama runs natively on macOS host (not in Docker)               │
+│  • Containers reach ollama via host.docker.internal:11434           │
+│  • Web app on :3000, chat app on :3001 (both via nginx)             │
+│  • internal-api (FastAPI :8001) stores chat history in PostgreSQL   │
+│  • Expose qdrant :6333 to host for the Qdrant web dashboard         │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 The `architecture-vms.txt` file in this repo describes the production multi-VM layout (separate GPU VMs for LLM and embeddings, a Qdrant cluster, horizontally-scaled API nodes).
@@ -63,10 +65,13 @@ The `architecture-vms.txt` file in this repo describes the production multi-VM l
 | Component        | Technology                                                              |
 | ---------------- | ----------------------------------------------------------------------- |
 | Frontend         | [SvelteKit 5](https://svelte.dev/docs/kit) + Tailwind CSS 4             |
+| Chat Frontend    | SvelteKit 5 + Tailwind CSS 4 (chatbot UI, `services/chat`)              |
 | API              | [FastAPI](https://fastapi.tiangolo.com/) + Uvicorn                      |
+| Internal API     | FastAPI + SQLAlchemy 2.0 (chat session storage, `services/internal-api`)|
 | Document parsing | [Docling](https://github.com/DS4SD/docling) (PDF, DOCX, PPTX, and more) |
 | LLM + Embeddings | [Ollama](https://ollama.com/)                                           |
 | Vector database  | [Qdrant](https://qdrant.tech/)                                          |
+| Relational DB    | PostgreSQL 16 (chat sessions & message history)                         |
 | Task queue       | [Redis](https://redis.io/)                                              |
 | Reverse proxy    | Nginx                                                                   |
 | Containerization | Docker + Docker Compose                                                 |
@@ -135,7 +140,9 @@ This starts nginx, the web app, the API, Qdrant, Redis, and the ingestion worker
 #### 4. Verify
 
 - Web UI: `http://localhost:3000`
+- Chat UI: `http://localhost:3001`
 - API health check: `http://localhost:8000/healthz`
+- Internal API health check: `http://localhost:3001/internal-api/healthz`
 - Qdrant dashboard: `http://localhost:6333/dashboard`
 
 ### Running Ollama
@@ -265,21 +272,33 @@ All configuration is via environment variables (set in `.env`):
 | `CHUNK_OVERLAP`    | `64`                  | Token overlap between adjacent chunks    |
 | `EMBED_BATCH_SIZE` | `32`                  | Chunks per embedding request             |
 | `MAX_RETRIES`      | `3`                   | Worker retry attempts before dead-letter |
+| `POSTGRES_DB`      | `datacontext`         | PostgreSQL database name                 |
+| `POSTGRES_USER`    | `dcs`                 | PostgreSQL user                          |
+| `POSTGRES_PASSWORD`| `dcs_password`        | PostgreSQL password                      |
+| `DATABASE_URL`     | `postgresql+asyncpg://dcs:dcs_password@postgres:5432/datacontext` | Async connection string for internal-api |
 
 ## Project Structure
 
 ```
 sandbox/
 ├── docker-compose.yml        # Local development stack
-├── nginx/default.conf        # Reverse proxy config (:3000→web, :8000→api)
+├── nginx/default.conf        # Reverse proxy (:3000→web, :3001→chat, :8000→api)
 ├── services/
-│   ├── web/                  # SvelteKit frontend (Svelte 5, Tailwind CSS 4)
+│   ├── web/                  # SvelteKit frontend (document upload + search UI)
 │   │   ├── src/routes/       # SvelteKit pages and layouts
+│   │   └── Dockerfile
+│   ├── chat/                 # SvelteKit chatbot UI
+│   │   ├── src/routes/[session_id]/  # Chat page (loads session + message history)
 │   │   └── Dockerfile
 │   ├── api/                  # FastAPI service (ingest, query, job status)
 │   │   ├── api/
 │   │   │   ├── routers/      # ingest.py, query.py, jobs.py
 │   │   │   └── services/     # embedder, searcher, queue, storage
+│   │   └── Dockerfile
+│   ├── internal-api/         # FastAPI service (chat sessions + messages → PostgreSQL)
+│   │   ├── api/
+│   │   │   ├── database.py   # SQLAlchemy models (chatbot_sessions, chat_messages)
+│   │   │   └── routers/      # sessions.py, messages.py
 │   │   └── Dockerfile
 │   └── worker/               # Background ingestion worker
 │       ├── worker/

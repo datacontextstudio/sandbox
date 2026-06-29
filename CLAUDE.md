@@ -13,12 +13,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | SvelteKit 5 + TypeScript + Tailwind CSS 4 |
+| Frontend | SvelteKit 5 + TypeScript + Tailwind CSS 4 (`services/web`) |
+| Chat Frontend | SvelteKit 5 + TypeScript + Tailwind CSS 4 (`services/chat`) |
 | Backend API | FastAPI + Python 3.14 + Uvicorn |
+| Internal API | FastAPI + Python 3.14 + Uvicorn + SQLAlchemy 2.0 + asyncpg |
 | Ingestion Worker | Python 3.14 + Docling + Redis consumer |
 | Vector DB | Qdrant (COSINE distance, `nomic-embed-text` embeddings, 384 dims) |
+| Relational DB | PostgreSQL 16 (chat sessions & message history) |
 | Task Queue | Redis 7 (FIFO list + job hash keys, AOF persistence) |
-| Reverse Proxy | Nginx (port 3000 → web+api, port 8000 → api only) |
+| Reverse Proxy | Nginx (`:3000`→web+api, `:3001`→chat+api, `:8000`→api only) |
 | LLM & Embeddings | Ollama running natively on macOS host (not containerized) |
 
 ## Running Locally
@@ -39,17 +42,19 @@ docker-compose build
 docker-compose up -d
 ```
 
-**Access**: http://localhost:3000
+**Access**: http://localhost:3000 (web app), http://localhost:3001 (chat app)
 
-**Docker Compose services**: `nginx`, `web`, `api`, `worker`, `qdrant`, `redis`
+**Docker Compose services**: `nginx`, `web`, `api`, `internal-api`, `worker`, `qdrant`, `redis`, `postgres`, `chat`
 (Ollama runs on the host; Docker containers reach it via `host.docker.internal:11434`)
 
 ## Directory Structure
 
 ```
 services/
-  web/                  SvelteKit 5 frontend
-  api/                  FastAPI backend
+  web/                  SvelteKit 5 frontend (document upload + search UI)
+  chat/                 SvelteKit 5 chatbot UI
+  api/                  FastAPI backend (RAG: ingest, query, collections)
+  internal-api/         FastAPI chat session & message API (PostgreSQL)
   worker/               Ingestion worker (Docling → Qdrant)
 nginx/                  Reverse proxy config
 sample-data/            Test PDFs for development
@@ -79,6 +84,16 @@ services/worker/warmup/               Pre-downloads Docling/HF models at Docker 
 
 services/web/src/lib/api.ts           Frontend API client
 services/web/src/routes/              SvelteKit pages: upload/, query/, collections/
+
+services/internal-api/api/main.py              FastAPI entry point (CORS, router setup)
+services/internal-api/api/database.py          SQLAlchemy models + create_tables() on startup
+services/internal-api/api/models.py            Pydantic request/response schemas
+services/internal-api/api/routers/sessions.py  Session CRUD endpoints
+services/internal-api/api/routers/messages.py  Message CRUD endpoints
+
+services/chat/src/lib/api.ts                        API client (internal-api + main api)
+services/chat/src/routes/[session_id]/+page.svelte  Chat UI component
+services/chat/src/routes/[session_id]/+page.ts      Page loader (fetches session + messages)
 ```
 
 ## API Endpoints
@@ -95,6 +110,18 @@ services/web/src/routes/              SvelteKit pages: upload/, query/, collecti
 | GET | `/healthz` | Health check → `{"status": "ok"}` |
 
 No authentication on any endpoint.
+
+## Internal API Endpoints
+
+Served at `/internal-api/` (port 3000 and 3001 via nginx; port 8001 directly).
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/sessions` | Create chat session (body: `collections: list[str]`) |
+| GET | `/sessions/{session_id}` | Fetch session metadata |
+| POST | `/sessions/{session_id}/messages` | Save a message (`role`: `user` or `assistant`) |
+| GET | `/sessions/{session_id}/messages` | List all messages, ordered by `created_at` |
+| GET | `/healthz` | Health check → `{"status": "ok"}` |
 
 ## Ingestion Pipeline
 
@@ -113,12 +140,39 @@ OLLAMA_BASE_URL=http://host.docker.internal:11434
 QDRANT_HOST=qdrant
 QDRANT_PORT=6333
 REDIS_URL=redis://redis:6379
+POSTGRES_DB=datacontext
+POSTGRES_USER=dcs
+POSTGRES_PASSWORD=dcs_password
+DATABASE_URL=postgresql+asyncpg://dcs:dcs_password@postgres:5432/datacontext
 ```
 
 Worker-only defaults (set in `worker/config.py`):
 - `EMBED_MODEL=nomic-embed-text`
 - `CHUNK_SIZE=512`, `CHUNK_OVERLAP=64`, `EMBED_BATCH_SIZE=32`
 - `MAX_RETRIES=3`
+
+## PostgreSQL Schema
+
+Two tables are auto-created at `internal-api` startup via SQLAlchemy (`create_tables()`):
+
+| Table | Column | Type | Notes |
+|-------|--------|------|-------|
+| `chatbot_sessions` | `id` | UUID PK | |
+| | `collections` | text[] | Qdrant collections to search |
+| | `created_at` | timestamptz | |
+| `chat_messages` | `id` | UUID PK | |
+| | `session_id` | UUID FK | → `chatbot_sessions.id`, cascade delete |
+| | `role` | text | `user` or `assistant` |
+| | `content` | text | Message body |
+| | `created_at` | timestamptz | |
+
+## Chat Flow
+
+1. Chat UI (`services/chat`) loads session metadata + message history from `internal-api` (PostgreSQL)
+2. User sends a message → saved as `role=user` via `POST /sessions/{id}/messages`
+3. Chat UI calls `POST /api/query` (main API) with `generate: true` to get an LLM answer
+4. LLM response saved as `role=assistant` via `POST /sessions/{id}/messages`
+5. UI re-renders with both messages appended
 
 ## Redis Key Schema
 
