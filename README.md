@@ -84,35 +84,35 @@ The `architecture-vms.txt` file in this repo describes the production multi-VM l
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
-- [Ollama](https://ollama.com/) running natively on macOS (see [Running Ollama](#running-ollama) below)
-- [Homebrew](https://brew.sh/) to install packages if running Ollama natively
+- [Homebrew](https://brew.sh/) (used to install Ollama via `brew bundle`)
 
-### Quickstart — use `run.sh`
-
-The easiest way to get everything running is to use the provided `run.sh` script:
+### Quickstart
 
 ```bash
 git clone https://github.com/datacontextstudio/sandbox.git
 cd sandbox
-./run.sh
+make start
 ```
 
-The script does the following:
+`make start` runs the full first-time setup: copies `.env`, installs Ollama via Homebrew, pulls the required models, builds the Docker images, and starts the stack.
 
-```bash
-cp .env.example .env
+> **First-run warning:** The initial build can take **up to 30 minutes** — Docker must download and compile Docling, PyTorch, and many other large dependencies. Subsequent starts are fast.
 
-brew install ollama
-brew services start ollama
-ollama pull llama3
-ollama pull nomic-embed-text
+### Make targets
 
-# this will take a while (10-20 minutes), be patient
-docker-compose build
-docker-compose up -d
-```
-
-> **First-run warning:** The initial `docker-compose build` (or `docker-compose up`) can take **up to 30 minutes**. Docker needs to download and compile a large set of dependencies including Docling, PyTorch, and their transitive packages. Subsequent starts are fast.
+| Target | What it does |
+| --------------- | ------------------------------------------------------------------ |
+| `make install` | Install Homebrew dependencies (`brew bundle`) |
+| `make env` | Copy `.env.example` to `.env` (skips if `.env` already exists) |
+| `make ollama-start` | Start Ollama as a macOS background service |
+| `make ollama-models` | Pull required Ollama models (`llama3`, `nomic-embed-text`) |
+| `make setup` | Run `env` → `install` → `ollama-start` → `ollama-models` |
+| `make build` | Build Docker images (`docker-compose build`) |
+| `make up` | Start the stack in the background (`docker-compose up -d`) |
+| `make down` | Stop and remove containers (`docker-compose down`) |
+| `make logs` | Tail all container logs (`docker-compose logs -f`) |
+| `make restart` | `down` then `up` |
+| `make start` | Full first-time setup: `setup` + `build` + `up` |
 
 ### Manual setup
 
@@ -121,7 +121,7 @@ docker-compose up -d
 ```bash
 git clone https://github.com/datacontextstudio/sandbox.git
 cd sandbox
-cp .env.example .env
+make env
 ```
 
 The defaults in `.env` work out of the box. Edit them if you need to point at external services.
@@ -130,13 +130,19 @@ The defaults in `.env` work out of the box. Edit them if you need to point at ex
 
 See [Running Ollama](#running-ollama) below. Ollama must be running before you start the Docker stack.
 
+```bash
+make install
+make ollama-start
+make ollama-models
+```
+
 #### 3. Build and start the stack
 
 > **First-run warning:** The initial build can take **up to 30 minutes** — Docker must download and compile Docling, PyTorch, and many other large dependencies. Subsequent starts are fast.
 
 ```bash
-docker-compose build
-docker-compose up -d
+make build
+make up
 ```
 
 This starts nginx, the web app, the API, Qdrant, Redis, and the ingestion worker. Ollama runs on your Mac, not in Docker.
