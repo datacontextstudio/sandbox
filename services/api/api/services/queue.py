@@ -13,7 +13,7 @@ def _job_key(job_id: str) -> str:
 
 
 async def enqueue(job: IngestJob) -> None:
-    r = aioredis.from_url(settings.redis_url, decode_responses=True)
+    r = aioredis.from_url(settings.valkey_url, decode_responses=True)
     try:
         now = datetime.now(timezone.utc).isoformat()
         await r.hset(
@@ -32,7 +32,7 @@ async def enqueue(job: IngestJob) -> None:
 
 
 async def get_job_fields(job_id: str) -> dict[str, str] | None:
-    r = aioredis.from_url(settings.redis_url, decode_responses=True)
+    r = aioredis.from_url(settings.valkey_url, decode_responses=True)
     try:
         fields = await r.hgetall(_job_key(job_id))
         return fields if fields else None
@@ -41,7 +41,7 @@ async def get_job_fields(job_id: str) -> dict[str, str] | None:
 
 
 async def delete_job(job_id: str) -> None:
-    r = aioredis.from_url(settings.redis_url, decode_responses=True)
+    r = aioredis.from_url(settings.valkey_url, decode_responses=True)
     try:
         await r.delete(_job_key(job_id))
     finally:

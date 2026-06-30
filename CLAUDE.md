@@ -11,18 +11,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | SvelteKit 5 + TypeScript + Tailwind CSS 4 (`services/web`) |
-| Chat Frontend | SvelteKit 5 + TypeScript + Tailwind CSS 4 (`services/chat`) |
-| Backend API | FastAPI + Python 3.14 + Uvicorn |
-| Internal API | FastAPI + Python 3.14 + Uvicorn + SQLAlchemy 2.0 + asyncpg |
-| Ingestion Worker | Python 3.14 + Docling + Redis consumer |
-| Vector DB | Qdrant (COSINE distance, `nomic-embed-text` embeddings, 384 dims) |
-| Relational DB | PostgreSQL 16 (chat sessions & message history) |
-| Task Queue | Redis 7 (FIFO list + job hash keys, AOF persistence) |
-| Reverse Proxy | Nginx (`:3000`→web+api, `:3001`→chat+api, `:8000`→api only) |
-| LLM & Embeddings | Ollama running natively on macOS host (not containerized) |
+| Layer            | Technology                                                        |
+| ---------------- | ----------------------------------------------------------------- |
+| Frontend         | SvelteKit 5 + TypeScript + Tailwind CSS 4 (`services/web`)        |
+| Chat Frontend    | SvelteKit 5 + TypeScript + Tailwind CSS 4 (`services/chat`)       |
+| Backend API      | FastAPI + Python 3.14 + Uvicorn                                   |
+| Internal API     | FastAPI + Python 3.14 + Uvicorn + SQLAlchemy 2.0 + asyncpg        |
+| Ingestion Worker | Python 3.14 + Docling + Valkey consumer                           |
+| Vector DB        | Qdrant (COSINE distance, `nomic-embed-text` embeddings, 384 dims) |
+| Relational DB    | PostgreSQL 16 (chat sessions & message history)                   |
+| Task Queue       | Valkey 8 (FIFO list + job hash keys)                              |
+| Reverse Proxy    | Nginx (`:3000`→web+api, `:3001`→chat+api, `:8000`→api only)       |
+| LLM & Embeddings | Ollama running natively on macOS host (not containerized)         |
 
 ## Running Locally
 
@@ -33,6 +33,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 
 Or manually:
+
 ```bash
 cp .env.example .env
 brew services start ollama
@@ -44,7 +45,7 @@ docker-compose up -d
 
 **Access**: http://localhost:3000 (web app), http://localhost:3001 (chat app)
 
-**Docker Compose services**: `nginx`, `web`, `api`, `internal-api`, `worker`, `qdrant`, `redis`, `postgres`, `chat`
+**Docker Compose services**: `nginx`, `web`, `api`, `internal-api`, `worker`, `qdrant`, `valkey`, `postgres`, `chat`
 (Ollama runs on the host; Docker containers reach it via `host.docker.internal:11434`)
 
 ## Directory Structure
@@ -74,7 +75,7 @@ services/api/api/models.py            Request/response data models
 services/api/api/routers/             Endpoint handlers (ingest, query, collections, documents, jobs)
 services/api/api/services/            Core services: embedder, searcher, queue, storage
 
-services/worker/worker/consumer.py    Redis queue consumer (dequeue → pipeline → status update)
+services/worker/worker/consumer.py    Valkey queue consumer (dequeue → pipeline → status update)
 services/worker/worker/pipeline.py    Orchestrates parse → chunk → embed → index
 services/worker/worker/parser.py      Docling document converter (PDF/DOCX/PPTX → markdown)
 services/worker/worker/chunker.py     Recursive text splitter
@@ -98,16 +99,16 @@ services/chat/src/routes/[session_id]/+page.ts      Page loader (fetches session
 
 ## API Endpoints
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| POST | `/ingest` | Upload file, enqueue ingestion job |
-| GET | `/jobs/{job_id}` | Poll job status |
-| POST | `/query` | Semantic search + optional LLM answer |
-| GET | `/collections` | List all collection names |
-| GET | `/collections/{name}/documents` | List documents in a collection |
-| DELETE | `/collections/{name}/documents/{job_id}` | Delete single document |
-| DELETE | `/collections/{name}` | Delete entire collection |
-| GET | `/healthz` | Health check → `{"status": "ok"}` |
+| Method | Endpoint                                 | Purpose                               |
+| ------ | ---------------------------------------- | ------------------------------------- |
+| POST   | `/ingest`                                | Upload file, enqueue ingestion job    |
+| GET    | `/jobs/{job_id}`                         | Poll job status                       |
+| POST   | `/query`                                 | Semantic search + optional LLM answer |
+| GET    | `/collections`                           | List all collection names             |
+| GET    | `/collections/{name}/documents`          | List documents in a collection        |
+| DELETE | `/collections/{name}/documents/{job_id}` | Delete single document                |
+| DELETE | `/collections/{name}`                    | Delete entire collection              |
+| GET    | `/healthz`                               | Health check → `{"status": "ok"}`     |
 
 No authentication on any endpoint.
 
@@ -115,13 +116,13 @@ No authentication on any endpoint.
 
 Served at `/internal-api/` (port 3000 and 3001 via nginx; port 8001 directly).
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| POST | `/sessions` | Create chat session (body: `collections: list[str]`) |
-| GET | `/sessions/{session_id}` | Fetch session metadata |
-| POST | `/sessions/{session_id}/messages` | Save a message (`role`: `user` or `assistant`) |
-| GET | `/sessions/{session_id}/messages` | List all messages, ordered by `created_at` |
-| GET | `/healthz` | Health check → `{"status": "ok"}` |
+| Method | Endpoint                          | Purpose                                              |
+| ------ | --------------------------------- | ---------------------------------------------------- |
+| POST   | `/sessions`                       | Create chat session (body: `collections: list[str]`) |
+| GET    | `/sessions/{session_id}`          | Fetch session metadata                               |
+| POST   | `/sessions/{session_id}/messages` | Save a message (`role`: `user` or `assistant`)       |
+| GET    | `/sessions/{session_id}/messages` | List all messages, ordered by `created_at`           |
+| GET    | `/healthz`                        | Health check → `{"status": "ok"}`                    |
 
 ## Ingestion Pipeline
 
@@ -139,7 +140,7 @@ Served at `/internal-api/` (port 3000 and 3001 via nginx; port 8001 directly).
 OLLAMA_BASE_URL=http://host.docker.internal:11434
 QDRANT_HOST=qdrant
 QDRANT_PORT=6333
-REDIS_URL=redis://redis:6379
+VALKEY_URL=redis://valkey:6379
 POSTGRES_DB=datacontext
 POSTGRES_USER=dcs
 POSTGRES_PASSWORD=dcs_password
@@ -147,6 +148,7 @@ DATABASE_URL=postgresql+asyncpg://dcs:dcs_password@postgres:5432/datacontext
 ```
 
 Worker-only defaults (set in `worker/config.py`):
+
 - `EMBED_MODEL=nomic-embed-text`
 - `CHUNK_SIZE=512`, `CHUNK_OVERLAP=64`, `EMBED_BATCH_SIZE=32`
 - `MAX_RETRIES=3`
@@ -155,16 +157,16 @@ Worker-only defaults (set in `worker/config.py`):
 
 Two tables are auto-created at `internal-api` startup via SQLAlchemy (`create_tables()`):
 
-| Table | Column | Type | Notes |
-|-------|--------|------|-------|
-| `chatbot_sessions` | `id` | UUID PK | |
-| | `collections` | text[] | Qdrant collections to search |
-| | `created_at` | timestamptz | |
-| `chat_messages` | `id` | UUID PK | |
-| | `session_id` | UUID FK | → `chatbot_sessions.id`, cascade delete |
-| | `role` | text | `user` or `assistant` |
-| | `content` | text | Message body |
-| | `created_at` | timestamptz | |
+| Table              | Column        | Type        | Notes                                   |
+| ------------------ | ------------- | ----------- | --------------------------------------- |
+| `chatbot_sessions` | `id`          | UUID PK     |                                         |
+|                    | `collections` | text[]      | Qdrant collections to search            |
+|                    | `created_at`  | timestamptz |                                         |
+| `chat_messages`    | `id`          | UUID PK     |                                         |
+|                    | `session_id`  | UUID FK     | → `chatbot_sessions.id`, cascade delete |
+|                    | `role`        | text        | `user` or `assistant`                   |
+|                    | `content`     | text        | Message body                            |
+|                    | `created_at`  | timestamptz |                                         |
 
 ## Chat Flow
 
@@ -174,17 +176,18 @@ Two tables are auto-created at `internal-api` startup via SQLAlchemy (`create_ta
 4. LLM response saved as `role=assistant` via `POST /sessions/{id}/messages`
 5. UI re-renders with both messages appended
 
-## Redis Key Schema
+## Valkey Key Schema
 
-| Key | Type | Purpose |
-|-----|------|---------|
-| `dcs:queue:ingestion` | List | FIFO ingestion job queue |
-| `dcs:job:{job_id}` | Hash | Job state: status, submitted_at, updated_at, file_path, collection_name, chunks_indexed, error |
-| `dcs:dlq:ingestion` | List | Dead-letter queue for failed jobs |
+| Key                   | Type | Purpose                                                                                        |
+| --------------------- | ---- | ---------------------------------------------------------------------------------------------- |
+| `dcs:queue:ingestion` | List | FIFO ingestion job queue                                                                       |
+| `dcs:job:{job_id}`    | Hash | Job state: status, submitted_at, updated_at, file_path, collection_name, chunks_indexed, error |
+| `dcs:dlq:ingestion`   | List | Dead-letter queue for failed jobs                                                              |
 
 ## Planned Future Architecture
 
 `architecture-vms.txt` describes the eventual production layout:
+
 - Separate GPU VMs for vLLM (LLM inference) and TEI (embeddings)
 - Horizontally-scaled API VMs behind a load balancer
 - Multi-node Qdrant cluster with persistent disk

@@ -58,7 +58,7 @@ def _handle_message(r: redis_lib.Redis, raw: bytes) -> None:
 
 def run(stop_event=None) -> None:
     r = redis_lib.from_url(
-        settings.redis_url,
+        settings.valkey_url,
         decode_responses=False,
         socket_timeout=BLPOP_TIMEOUT + 1,
         socket_connect_timeout=5,

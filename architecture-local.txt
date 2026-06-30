@@ -25,7 +25,7 @@
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │                     Ingestion Layer                          │   │
 │  │                                                              │   │
-│  │  redis :6379 ──► worker (ingestion container)                │   │
+│  │  valkey:6379 ──► worker (ingestion container)                │   │
 │  │                    ├── Parse documents (Docling)             │   │
 │  │                    ├── Chunk documents                       │   │
 │  │                    ├── Embed  (→ ollama)                     │   │

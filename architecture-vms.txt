@@ -30,7 +30,7 @@
 │┌───────────────────────────▼─────────────────────────────────┐│
 ││                    Ingestion Layer                          ││
 ││                                                             ││
-││   Message Queue (Redis / RabbitMQ on VM)                    ││
+││   Message Queue (Valkey / RabbitMQ on VM)                   ││
 ││        └── Ingestion Workers (Docker containers)            ││
 ││              ├── Parse documents (Docling)                  ││
 ││              ├── Chunk documents                            ││

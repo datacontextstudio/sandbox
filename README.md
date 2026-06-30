@@ -38,7 +38,7 @@ A self-hosted, open-source RAG (Retrieval-Augmented Generation) platform. Upload
 │                                                                     │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │                     Ingestion Layer                          │   │
-│  │  redis :6379 ──► worker (ingestion container)                │   │
+│  │  valkey:6379 ──► worker (ingestion container)                │   │
 │  │                    ├── Parse documents (Docling)             │   │
 │  │                    ├── Chunk documents                       │   │
 │  │                    ├── Embed  (→ ollama)                     │   │
@@ -75,7 +75,7 @@ The `architecture-vms.txt` file in this repo describes the production multi-VM l
 | LLM + Embeddings | [Ollama](https://ollama.com/)                                            |
 | Vector database  | [Qdrant](https://qdrant.tech/)                                           |
 | Relational DB    | PostgreSQL 16 (chat sessions & message history)                          |
-| Task queue       | [Redis](https://redis.io/)                                               |
+| Task queue       | [Valkey](https://valkey.io/)                                             |
 | Reverse proxy    | Nginx                                                                    |
 | Containerization | Docker + Docker Compose                                                  |
 
@@ -100,19 +100,19 @@ make start
 
 ### Make targets
 
-| Target | What it does |
-| --------------- | ------------------------------------------------------------------ |
-| `make install` | Install Homebrew dependencies (`brew bundle`) |
-| `make env` | Copy `.env.example` to `.env` (skips if `.env` already exists) |
-| `make ollama-start` | Start Ollama as a macOS background service |
-| `make ollama-models` | Pull required Ollama models (`llama3`, `nomic-embed-text`) |
-| `make setup` | Run `env` → `install` → `ollama-start` → `ollama-models` |
-| `make build` | Build Docker images (`docker-compose build`) |
-| `make up` | Start the stack in the background (`docker-compose up -d`) |
-| `make down` | Stop and remove containers (`docker-compose down`) |
-| `make logs` | Tail all container logs (`docker-compose logs -f`) |
-| `make restart` | `down` then `up` |
-| `make start` | Full first-time setup: `setup` + `build` + `up` |
+| Target               | What it does                                                   |
+| -------------------- | -------------------------------------------------------------- |
+| `make install`       | Install Homebrew dependencies (`brew bundle`)                  |
+| `make env`           | Copy `.env.example` to `.env` (skips if `.env` already exists) |
+| `make ollama-start`  | Start Ollama as a macOS background service                     |
+| `make ollama-models` | Pull required Ollama models (`llama3`, `nomic-embed-text`)     |
+| `make setup`         | Run `env` → `install` → `ollama-start` → `ollama-models`       |
+| `make build`         | Build Docker images (`docker-compose build`)                   |
+| `make up`            | Start the stack in the background (`docker-compose up -d`)     |
+| `make down`          | Stop and remove containers (`docker-compose down`)             |
+| `make logs`          | Tail all container logs (`docker-compose logs -f`)             |
+| `make restart`       | `down` then `up`                                               |
+| `make start`         | Full first-time setup: `setup` + `build` + `up`                |
 
 ### Manual setup
 
@@ -145,7 +145,7 @@ make build
 make up
 ```
 
-This starts nginx, the web app, the API, Qdrant, Redis, and the ingestion worker. Ollama runs on your Mac, not in Docker.
+This starts nginx, the web app, the API, Qdrant, Valkey, and the ingestion worker. Ollama runs on your Mac, not in Docker.
 
 #### 4. Verify
 
@@ -215,7 +215,7 @@ All URLs available on `localhost` after `docker-compose up -d`:
 | `http://localhost:6333`               | Qdrant REST            | Vector DB REST API                                  |
 | `http://localhost:6333/dashboard`     | Qdrant dashboard       | Web UI for browsing collections and running queries |
 | `localhost:6334`                      | Qdrant gRPC            | gRPC API (TCP, not HTTP)                            |
-| `localhost:6379`                      | Redis                  | Task queue (TCP, not HTTP)                          |
+| `localhost:6379`                      | Valkey                 | Task queue (TCP, not HTTP)                          |
 
 > The `/api/` and `/internal-api/` paths are available on both `:3000` and `:3001` so that browser-side code in each app can call APIs without cross-origin requests.
 
@@ -297,7 +297,7 @@ All configuration is via environment variables (set in `.env`):
 | `OLLAMA_BASE_URL`   | `http://host.docker.internal:11434`                               | Ollama endpoint (native macOS host)      |
 | `QDRANT_HOST`       | `qdrant`                                                          | Qdrant hostname                          |
 | `QDRANT_PORT`       | `6333`                                                            | Qdrant REST port                         |
-| `REDIS_URL`         | `redis://redis:6379`                                              | Redis connection URL                     |
+| `VALKEY_URL`        | `redis://valkey:6379`                                             | Valkey connection URL                    |
 | `STORAGE_PATH`      | `/data/storage`                                                   | Raw document storage path                |
 | `EMBED_MODEL`       | `nomic-embed-text`                                                | Ollama model used for embeddings         |
 | `CHUNK_SIZE`        | `512`                                                             | Token target for text chunks             |

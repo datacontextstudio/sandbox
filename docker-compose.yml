@@ -55,14 +55,14 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       QDRANT_HOST: ${QDRANT_HOST:-qdrant}
       QDRANT_PORT: ${QDRANT_PORT:-6333}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      VALKEY_URL: ${VALKEY_URL:-redis://valkey:6379}
       STORAGE_PATH: /data/documents
     volumes:
       - storage_data:/data/documents
     depends_on:
       # - ollama
       - qdrant
-      - redis
+      - valkey
     restart: unless-stopped
 
   # # ---------------------------------------------------------------------------
@@ -130,14 +130,14 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # Ingestion Layer — Redis queue
+  # Ingestion Layer — Valkey queue
   # ---------------------------------------------------------------------------
-  redis:
-    image: redis:7-alpine
+  valkey:
+    image: valkey/valkey:8-alpine
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - valkey_data:/data
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ services:
     build:
       context: ./services/worker
     environment:
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      VALKEY_URL: ${VALKEY_URL:-redis://valkey:6379}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       QDRANT_HOST: ${QDRANT_HOST:-qdrant}
       QDRANT_PORT: ${QDRANT_PORT:-6333}
@@ -159,7 +159,7 @@ services:
     volumes:
       - storage_data:/data/documents
     depends_on:
-      - redis
+      - valkey
       # - ollama
       - qdrant
     restart: unless-stopped
@@ -170,6 +170,6 @@ services:
 volumes:
 #  ollama_data:    # Ollama model cache (~GB per model)
   qdrant_data:    # Vector DB collections + indexes
-  redis_data:     # Redis AOF persistence
+  valkey_data:    # Valkey persistence
   storage_data:   # Raw documents before ingestion
   postgres_data:  # PostgreSQL chat sessions + messages
