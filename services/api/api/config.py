@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     qdrant_port: int = 6333
     storage_path: str = "/data/documents"
     embed_model: str = "nomic-embed-text"
+    llm_model: str = "llama3.1"
+    mcp_servers: str = "[]"
 
     class Config:
         env_file = ".env"

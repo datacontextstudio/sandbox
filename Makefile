@@ -7,7 +7,7 @@ help:
 	@echo "  install        Install Homebrew dependencies (brew bundle)"
 	@echo "  env            Copy .env.example to .env (skips if .env already exists)"
 	@echo "  ollama-start   Start Ollama as a macOS background service"
-	@echo "  ollama-models  Pull required Ollama models (llama3, nomic-embed-text)"
+	@echo "  ollama-models  Pull required Ollama models (llama3.1, nomic-embed-text)"
 	@echo "  setup          Run env + install + ollama-start + ollama-models"
 	@echo "  build          Build Docker images (docker-compose build)"
 	@echo "  up             Start the stack in the background (docker-compose up -d)"
@@ -26,7 +26,7 @@ ollama-start:
 	brew services start ollama
 
 ollama-models:
-	ollama pull llama3
+	ollama pull llama3.1
 	ollama pull nomic-embed-text
 
 setup: env install ollama-start ollama-models

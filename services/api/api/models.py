@@ -33,7 +33,7 @@ class QueryRequest(BaseModel):
     collections: list[str] = Field(default_factory=lambda: ["default"])
     top_k: int = 5
     generate: bool = False
-    llm_model: str = "llama3"
+    llm_model: str = "llama3.1"
     include_results: bool = True
 
 
@@ -80,7 +80,7 @@ class DeleteResponse(BaseModel):
 
 class TitleRequest(BaseModel):
     query: str
-    llm_model: str = "llama3"
+    llm_model: str = "llama3.1"
 
 
 class TitleResponse(BaseModel):
