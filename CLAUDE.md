@@ -48,7 +48,7 @@ Or manually:
 ```bash
 cp .env.example .env
 brew services start ollama
-ollama pull llama3
+ollama pull llama3.1
 ollama pull nomic-embed-text
 docker-compose build
 docker-compose up -d

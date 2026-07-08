@@ -105,7 +105,7 @@ make start
 | `make install`       | Install Homebrew dependencies (`brew bundle`)                  |
 | `make env`           | Copy `.env.example` to `.env` (skips if `.env` already exists) |
 | `make ollama-start`  | Start Ollama as a macOS background service                     |
-| `make ollama-models` | Pull required Ollama models (`llama3`, `nomic-embed-text`)     |
+| `make ollama-models` | Pull required Ollama models (`llama3.1`, `nomic-embed-text`)   |
 | `make setup`         | Run `env` → `install` → `ollama-start` → `ollama-models`       |
 | `make build`         | Build Docker images (`docker-compose build`)                   |
 | `make up`            | Start the stack in the background (`docker-compose up -d`)     |
@@ -169,7 +169,7 @@ brew services start ollama   # starts automatically on login
 **Pull the required models (first time only):**
 
 ```bash
-ollama pull llama3
+ollama pull llama3.1
 ollama pull nomic-embed-text
 ```
 
@@ -193,7 +193,7 @@ OLLAMA_BASE_URL=http://ollama:11434
 And pull models via:
 
 ```bash
-docker-compose exec ollama ollama pull llama3
+docker-compose exec ollama ollama pull llama3.1
 docker-compose exec ollama ollama pull nomic-embed-text
 ```
 
@@ -282,7 +282,7 @@ curl -X POST http://localhost:8000/query \
     "collections": ["my-docs"],
     "top_k": 5,
     "generate": true,
-    "llm_model": "llama3"
+    "llm_model": "llama3.1"
   }'
 ```
 
