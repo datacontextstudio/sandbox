@@ -131,7 +131,7 @@ make ollama-models
 
 This runs:
 ```bash
-ollama pull llama3
+ollama pull llama3.1
 ollama pull nomic-embed-text
 ```
 

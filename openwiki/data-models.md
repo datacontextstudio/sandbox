@@ -91,7 +91,7 @@ class QueryRequest(BaseModel):
     collections: list[str] = Field(default_factory=lambda: ["default"])
     top_k: int = 5
     generate: bool = False
-    llm_model: str = "llama3"
+    llm_model: str = "llama3.1"
     include_results: bool = True
 ```
 
@@ -100,7 +100,7 @@ class QueryRequest(BaseModel):
 - `collections`: Which Qdrant collections to search (default: ["default"])
 - `top_k`: Number of results to return (default: 5)
 - `generate`: Whether to generate LLM answer (default: false)
-- `llm_model`: Which Ollama model to use (default: "llama3")
+- `llm_model`: Which Ollama model to use (default: "llama3.1")
 - `include_results`: Whether to include chunks in response (default: true)
 
 **Example**:
@@ -110,7 +110,7 @@ class QueryRequest(BaseModel):
   "collections": ["default", "faq"],
   "top_k": 10,
   "generate": true,
-  "llm_model": "llama3",
+  "llm_model": "llama3.1",
   "include_results": true
 }
 ```
@@ -313,14 +313,14 @@ class DeleteResponse(BaseModel):
 ```python
 class TitleRequest(BaseModel):
     query: str
-    llm_model: str = "llama3"
+    llm_model: str = "llama3.1"
 ```
 
 **Request** (from `POST /title`, generates a title for a chat session):
 ```json
 {
   "query": "What is the refund policy?",
-  "llm_model": "llama3"
+  "llm_model": "llama3.1"
 }
 ```
 

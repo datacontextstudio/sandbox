@@ -121,7 +121,7 @@ make start
 `make start` performs the full first-time setup:
 - Copies `.env.example` to `.env`
 - Installs Ollama via Homebrew
-- Pulls the required models (`llama3`, `nomic-embed-text`)
+- Pulls the required models (`llama3.1`, `nomic-embed-text`)
 - Builds Docker images
 - Starts the stack
 
@@ -224,7 +224,7 @@ brew services stop ollama
 5. If `generate=true`:
    - Concatenates top results as context
    - Builds prompt with system message (guiding the LLM to answer concisely)
-   - POSTs to Ollama `/api/chat` with `llama3` model
+   - POSTs to Ollama `/api/chat` with `llama3.1` model
    - Returns LLM-generated answer
 
 **Source**: See [Query Workflows](./workflows/query.md)

@@ -101,9 +101,10 @@ DataContext Studio consists of five main services deployed via Docker Compose, p
   - `queue.py` → Valkey client (enqueue/dequeue jobs)
   - `searcher.py` → Qdrant client (vector search)
   - `embedder.py` → Ollama client (text embedding)
+  - `mcp_client.py` → Model Context Protocol client (tool discovery and calling)
   - `storage.py` → File storage (Docker volume)
 - **Status**: Restarts unless stopped
-- **Dependencies**: Qdrant, Valkey, Ollama (for embeddings during query)
+- **Dependencies**: Qdrant, Valkey, Ollama (for embeddings and LLM generation), optional MCP servers (for tool calling)
 
 ### internal-api (FastAPI Chat History)
 
@@ -182,12 +183,12 @@ DataContext Studio consists of five main services deployed via Docker Compose, p
 
 - **Platform**: Native macOS (not containerized)
 - **Port**: 11434
-- **Purpose**: LLM inference (`llama3`) + text embeddings (`nomic-embed-text`)
+- **Purpose**: LLM inference (`llama3.1`) + text embeddings (`nomic-embed-text`)
 - **Docker Access**: Containers reach via `host.docker.internal:11434`
 - **Setup**:
   - Install: `brew install ollama`
   - Start: `brew services start ollama`
-  - Models: `ollama pull llama3`, `ollama pull nomic-embed-text`
+  - Models: `ollama pull llama3.1`, `ollama pull nomic-embed-text`
 - **Endpoints**:
   - `POST /api/embed` (embedding service)
   - `POST /api/chat` (chat/inference service)

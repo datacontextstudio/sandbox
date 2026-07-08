@@ -25,7 +25,7 @@ The query workflow enables semantic search across indexed documents and optional
   "collections": ["default", "finance-docs"],
   "top_k": 5,
   "generate": false,
-  "llm_model": "llama3",
+  "llm_model": "llama3.1",
   "include_results": true
 }
 ```
@@ -38,7 +38,7 @@ The query workflow enables semantic search across indexed documents and optional
 | `collections` | list[string] | ["default"] | Which Qdrant collections to search |
 | `top_k` | int | 5 | Number of top results to return |
 | `generate` | bool | false | Whether to generate an LLM answer |
-| `llm_model` | string | "llama3" | Which Ollama model to use for generation |
+| `llm_model` | string | "llama3.1" | Which Ollama model to use for generation |
 | `include_results` | bool | true | Whether to include search results in response |
 
 ### Response
@@ -213,47 +213,113 @@ messages = [
 
 ---
 
-#### 3.3 Call Ollama
+#### 3.3 Load Available MCP Tools (Optional)
+
+**Function**: `await get_tools(mcp_servers_json: str) -> list[dict]`
+
+**Handler**: `/services/api/api/services/mcp_client.py`
+
+**Process**:
+1. Parse MCP servers configuration from `settings.mcp_servers`
+2. Connect to each configured MCP server (via stdio or SSE)
+3. Call `session.list_tools()` to retrieve available tools
+4. Format tools for Ollama consumption:
+   ```json
+   {
+     "type": "function",
+     "function": {
+       "name": "tool_name",
+       "description": "Tool description",
+       "parameters": {...}
+     }
+   }
+   ```
+
+**Configuration**:
+- `MCP_SERVERS` from `.env` (JSON array of server configs)
+- Each server config: `{"type": "stdio"|"sse", "command": "...", "args": [...], "env": {...}}`
+- Returns empty list if no servers configured or connection fails
+
+**Source**: `/services/api/api/services/mcp_client.py`
+
+---
+
+#### 3.4 Agentic Tool Calling Loop
+
+The query handler implements an agentic loop that iterates up to `_MAX_TOOL_ITERATIONS` (10) times:
 
 ```python
-response = await httpx.AsyncClient(timeout=120.0).post(
-    f"{OLLAMA_BASE_URL}/api/chat",
-    json={
-        "model": llm_model,
+for _ in range(_MAX_TOOL_ITERATIONS):
+    payload: dict = {
+        "model": req.llm_model,
         "messages": messages,
         "stream": False,
     }
-)
-answer = response.json()["message"]["content"]
+    if tools:
+        payload["tools"] = tools
+
+    resp = await client.post(
+        f"{settings.ollama_base_url}/api/chat",
+        json=payload,
+    )
+    msg = resp.json()["message"]
+    
+    tool_calls = msg.get("tool_calls")
+    if not tool_calls:
+        answer = msg["content"]
+        break
+    
+    # Execute tool calls and append results to messages
+    messages.append({"role": "assistant", "content": msg.get("content", ""), "tool_calls": tool_calls})
+    for tc in tool_calls:
+        fn = tc["function"]
+        name = fn["name"]
+        args = fn.get("arguments", {})
+        if isinstance(args, str):
+            args = json.loads(args)
+        result = await call_tool(settings.mcp_servers, name, args)
+        messages.append({"role": "tool", "content": result})
 ```
 
+**Iteration Logic**:
+1. Build payload with model, messages, and tools (if any available)
+2. Send to Ollama `/api/chat`
+3. Check response for `tool_calls` field
+4. If no tool calls: extract answer and break loop
+5. If tool calls present:
+   - Append assistant message with tool calls to messages
+   - For each tool call: parse arguments, execute via `call_tool`, append tool result
+   - Continue to next iteration (LLM responds with more context)
+
 **Configuration**:
-- `llm_model` from request (default: "llama3")
+- `llm_model` from request (default: "llama3.1")
 - `OLLAMA_BASE_URL` from `.env`
 - Timeout: 120 seconds (generous for large contexts)
 - Streaming: disabled (wait for full response)
+- `_MAX_TOOL_ITERATIONS`: 10 (prevents infinite loops)
 
-**Response Structure**:
-```json
-{
-  "model": "llama3",
-  "created_at": "2024-01-01T10:00:00Z",
-  "message": {
-    "role": "assistant",
-    "content": "Based on the provided context, refunds are processed within 5-7 business days..."
-  }
-}
-```
+**Tool Execution**:
+- **Function**: `await call_tool(mcp_servers_json: str, tool_name: str, arguments: dict) -> str`
+- **Handler**: `/services/api/api/services/mcp_client.py`
+- **Process**:
+  1. Connect to each MCP server
+  2. List tools, find matching tool_name
+  3. Execute with `session.call_tool(tool_name, arguments)`
+  4. Extract text content from response
+  5. Return concatenated text or error message
 
 **Error Handling**:
 - If Ollama is offline: raises `HTTPException(502, "LLM service error")`
 - If model doesn't exist: Ollama returns error → propagated to user
+- If tool not found: returns `"Tool '{tool_name}' not found in any configured MCP server."`
 
-**Source**: `/services/api/api/routers/query.py`
+**Source**: `/services/api/api/routers/query.py` and `/services/api/api/services/mcp_client.py`
 
 ---
 
 ### 4. Return Response
+
+After the agentic loop completes (either via breaking on no tool calls or max iterations reached):
 
 ```python
 QueryResponse(
@@ -266,6 +332,7 @@ QueryResponse(
 **Conditional fields**:
 - `results` is null if `include_results=false`
 - `answer` is null if `generate=false` or no results were found
+- `answer` may contain LLM reasoning and tool call results if tools were executed
 
 ---
 
