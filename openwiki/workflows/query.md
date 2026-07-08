@@ -242,6 +242,15 @@ messages = [
 
 **Source**: `/services/api/api/services/mcp_client.py`
 
+**Example server shipped with this repo**: `services/fake-refund` is a demo
+MCP server (SSE transport, `mcp.server.fastmcp.FastMCP`) exposing fake Super
+Payments refund tools (`list_transactions`, `get_transaction`,
+`refund_transaction`) over seeded transaction data matching the
+`sample-data/*_transaction_report.pdf` documents. It's registered by default
+via `MCP_SERVERS` in `.env.example` and reachable at
+`http://fake-refund:8010/sse` on the internal docker network. See
+`/services/fake-refund/fake_refund/server.py` for the tool implementations.
+
 ---
 
 #### 3.4 Agentic Tool Calling Loop

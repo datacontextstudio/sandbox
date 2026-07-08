@@ -104,7 +104,18 @@ DataContext Studio consists of five main services deployed via Docker Compose, p
   - `mcp_client.py` → Model Context Protocol client (tool discovery and calling)
   - `storage.py` → File storage (Docker volume)
 - **Status**: Restarts unless stopped
-- **Dependencies**: Qdrant, Valkey, Ollama (for embeddings and LLM generation), optional MCP servers (for tool calling)
+- **Dependencies**: Qdrant, Valkey, Ollama (for embeddings and LLM generation), fake-refund (MCP server, for tool calling)
+
+### fake-refund (Demo MCP Server)
+
+- **Port**: 8010 (inside Docker only; not exposed to host)
+- **Purpose**: Example/demo MCP server exposing fake Super Payments refund tools (`list_transactions`, `get_transaction`, `refund_transaction`) that the `api` service's agentic query loop can call via SSE
+- **Tech**: Python 3.14 + `mcp` SDK (`FastMCP`, SSE transport)
+- **Configuration**: None (in-memory seed data, no env vars)
+- **Entry Point**: `/services/fake-refund/fake_refund/main.py`
+- **State**: In-memory only, seeded from `sample-data/*_transaction_report.pdf`; refunds issued during a session reset on container restart
+- **Status**: Restarts unless stopped
+- **Dependencies**: None (called by `api` via `MCP_SERVERS`)
 
 ### internal-api (FastAPI Chat History)
 
@@ -327,6 +338,7 @@ QDRANT_HOST=qdrant
 QDRANT_PORT=6333
 VALKEY_URL=redis://valkey:6379
 STORAGE_PATH=/data/documents
+MCP_SERVERS=[{"type": "sse", "url": "http://fake-refund:8010/sse"}]
 
 POSTGRES_DB=datacontext
 POSTGRES_USER=dcs

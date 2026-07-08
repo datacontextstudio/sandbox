@@ -57,12 +57,25 @@ services:
       QDRANT_PORT: ${QDRANT_PORT:-6333}
       VALKEY_URL: ${VALKEY_URL:-redis://valkey:6379}
       STORAGE_PATH: /data/documents
+      MCP_SERVERS: ${MCP_SERVERS:-[]}
     volumes:
       - storage_data:/data/documents
     depends_on:
       # - ollama
       - qdrant
       - valkey
+      - fake-refund
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Demo Tooling — fake-refund MCP server
+  # Standalone MCP server (SSE) exposing fake Super Payments refund tools for
+  # the api service's agentic query loop to call. Demo only: in-memory seed
+  # data, no persistence, no auth. Not reachable outside the docker network.
+  # ---------------------------------------------------------------------------
+  fake-refund:
+    build:
+      context: ./services/fake-refund
     restart: unless-stopped
 
   # # ---------------------------------------------------------------------------
