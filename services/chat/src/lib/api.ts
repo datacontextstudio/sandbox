@@ -83,7 +83,7 @@ export async function saveChatMessage(
 export async function queryCollections(
 	query: string,
 	collections: string[],
-	llmModel: string = 'llama3'
+	llmModel: string = 'llama3.1'
 ): Promise<string | null> {
 	const res = await fetch(`${API_BASE}/query`, {
 		method: 'POST',
@@ -103,7 +103,7 @@ export async function queryCollections(
 
 export async function generateTitle(
 	query: string,
-	llmModel: string = 'llama3'
+	llmModel: string = 'llama3.1'
 ): Promise<string> {
 	const res = await fetch(`${API_BASE}/generate-title`, {
 		method: 'POST',
