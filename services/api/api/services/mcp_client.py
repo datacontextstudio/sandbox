@@ -1,69 +1,56 @@
-import json
-from contextlib import asynccontextmanager
 from typing import Any
 
-from mcp import ClientSession, StdioServerParameters
+from mcp import ClientSession
 from mcp.client.sse import sse_client
-from mcp.client.stdio import stdio_client
 
 
-def _parse_servers(mcp_servers_json: str) -> list[dict]:
-    try:
-        return json.loads(mcp_servers_json)
-    except json.JSONDecodeError:
-        return []
+async def introspect_server(url: str) -> list[dict]:
+    async with sse_client(url) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.list_tools()
+            return [
+                {
+                    "name": tool.name,
+                    "description": tool.description or None,
+                    "input_schema": tool.inputSchema or {"type": "object", "properties": {}},
+                }
+                for tool in result.tools
+            ]
 
 
-@asynccontextmanager
-async def _connect(server: dict):
-    if server.get("type") == "sse":
-        async with sse_client(server["url"]) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                yield session
-    else:
-        params = StdioServerParameters(
-            command=server["command"],
-            args=server.get("args", []),
-            env=server.get("env"),
-        )
-        async with stdio_client(params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                yield session
+async def get_tools_for_selection(servers: list[dict]) -> list[dict]:
+    """Build Ollama-shaped tool defs from already-known (server, tool) metadata.
 
-
-async def get_tools(mcp_servers_json: str) -> list[dict]:
-    servers = _parse_servers(mcp_servers_json)
+    No live MCP connection is made here -- the tool metadata is resolved from
+    internal-api's Postgres store ahead of time.
+    """
     ollama_tools: list[dict] = []
     for server in servers:
-        try:
-            async with _connect(server) as session:
-                result = await session.list_tools()
-                for tool in result.tools:
-                    ollama_tools.append({
-                        "type": "function",
-                        "function": {
-                            "name": tool.name,
-                            "description": tool.description or "",
-                            "parameters": tool.inputSchema or {"type": "object", "properties": {}},
-                        },
-                    })
-        except Exception:
-            pass
+        for tool in server["tools"]:
+            ollama_tools.append({
+                "type": "function",
+                "function": {
+                    "name": f'{server["name"]}.{tool["name"]}',
+                    "description": tool.get("description") or "",
+                    "parameters": tool.get("input_schema") or {"type": "object", "properties": {}},
+                },
+            })
     return ollama_tools
 
 
-async def call_tool(mcp_servers_json: str, tool_name: str, arguments: dict[str, Any]) -> str:
-    servers = _parse_servers(mcp_servers_json)
-    for server in servers:
-        try:
-            async with _connect(server) as session:
-                tools = await session.list_tools()
-                if any(t.name == tool_name for t in tools.tools):
-                    result = await session.call_tool(tool_name, arguments)
-                    parts = [c.text for c in result.content if hasattr(c, "text")]
-                    return "\n".join(parts)
-        except Exception:
-            continue
-    return f"Tool '{tool_name}' not found in any configured MCP server."
+async def call_tool_by_namespaced_name(
+    servers: list[dict], namespaced_name: str, arguments: dict[str, Any]
+) -> str:
+    server_name, _, tool_name = namespaced_name.partition(".")
+    server = next((s for s in servers if s["name"] == server_name), None)
+    if server is None:
+        return f"Tool '{namespaced_name}' not found: unknown server '{server_name}'."
+    try:
+        async with sse_client(server["url"]) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(tool_name, arguments)
+                return "\n".join(c.text for c in result.content if hasattr(c, "text"))
+    except Exception as exc:
+        return f"Tool '{namespaced_name}' failed: {exc}"

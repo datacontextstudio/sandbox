@@ -42,7 +42,11 @@
 	async function respondToMessage(userQuery: string) {
 		sendError = null;
 		try {
-			const { answer, tool_responses } = await queryCollections(userQuery, data.session.collections);
+			const { answer, tool_responses } = await queryCollections(
+				userQuery,
+				data.session.collections,
+				data.session.tools
+			);
 			const assistantContent = answer ?? 'No answer was generated.';
 			const assistantMsg = await saveChatMessage(
 				data.session.id,

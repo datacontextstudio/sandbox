@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException
 from api.config import settings
 from api.models import QueryRequest, QueryResponse, ToolResponse
 from api.services import embedder
-from api.services.mcp_client import call_tool, get_tools
+from api.services.internal_api_client import resolve_selected_tools
+from api.services.mcp_client import call_tool_by_namespaced_name, get_tools_for_selection
 from api.services.searcher import search_many
 
 router = APIRouter()
@@ -64,7 +65,10 @@ async def _determine_tool_calls(
 
 
 async def _run_tool_calls(
-    tool_calls: list[dict], messages: list[dict], tool_responses: list[ToolResponse]
+    tool_calls: list[dict],
+    messages: list[dict],
+    tool_responses: list[ToolResponse],
+    servers: list[dict],
 ) -> None:
     for tc in tool_calls:
         fn = tc["function"]
@@ -72,7 +76,7 @@ async def _run_tool_calls(
         args = fn.get("arguments", {})
         if isinstance(args, str):
             args = json.loads(args)
-        result = await call_tool(settings.mcp_servers, name, args)
+        result = await call_tool_by_namespaced_name(servers, name, args)
         tool_responses.append(ToolResponse(tool=name, response=result))
         messages.append({"role": "tool", "content": result})
 
@@ -91,7 +95,8 @@ async def query(req: QueryRequest) -> QueryResponse:
 
     answer: str | None = None
     tool_responses: list[ToolResponse] = []
-    tools = await get_tools(settings.mcp_servers) if req.generate else []
+    servers = await resolve_selected_tools(req.tools) if req.generate and req.tools else []
+    tools = await get_tools_for_selection(servers) if servers else []
     if req.generate and (results or tools):
         context = "\n\n".join(r.text for r in results) if results else ""
         user_content = (
@@ -122,7 +127,7 @@ async def query(req: QueryRequest) -> QueryResponse:
                             "tool_calls": determination["tool_calls"],
                         }
                     )
-                    await _run_tool_calls(determination["tool_calls"], messages, tool_responses)
+                    await _run_tool_calls(determination["tool_calls"], messages, tool_responses, servers)
 
                     for _ in range(_MAX_TOOL_ITERATIONS - 1):
                         payload = {
@@ -143,7 +148,7 @@ async def query(req: QueryRequest) -> QueryResponse:
                         messages.append(
                             {"role": "assistant", "content": msg.get("content", ""), "tool_calls": tool_calls}
                         )
-                        await _run_tool_calls(tool_calls, messages, tool_responses)
+                        await _run_tool_calls(tool_calls, messages, tool_responses, servers)
                 else:
                     resp = await client.post(
                         f"{settings.ollama_base_url}/api/chat",

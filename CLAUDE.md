@@ -56,6 +56,11 @@ docker-compose up -d
 
 **Access**: http://localhost:3000 (web app), http://localhost:3001 (chat app)
 
+MCP tool servers are managed from the web app's **Tools** tab (not `.env`). A
+demo `fake-refund` MCP server ships with the stack but is not auto-registered;
+add it once from the Tools tab with name `fake-refund` and URL
+`http://fake-refund:8010/sse` to try it out.
+
 **Docker Compose services**: `nginx`, `web`, `api`, `internal-api`, `worker`, `qdrant`, `valkey`, `postgres`, `chat`
 (Ollama runs on the host; Docker containers reach it via `host.docker.internal:11434`)
 
@@ -95,7 +100,7 @@ services/worker/worker/indexer.py     Qdrant upsert with SHA256 chunk IDs
 services/worker/warmup/               Pre-downloads Docling/HF models at Docker build time
 
 services/web/src/lib/api.ts           Frontend API client
-services/web/src/routes/              SvelteKit pages: upload/, query/, collections/
+services/web/src/routes/              SvelteKit pages: upload/, query/, collections/, tools/
 
 services/internal-api/api/main.py              FastAPI entry point (CORS, router setup)
 services/internal-api/api/database.py          SQLAlchemy models + create_tables() on startup
@@ -127,13 +132,18 @@ No authentication on any endpoint.
 
 Served at `/internal-api/` (port 3000 and 3001 via nginx; port 8001 directly).
 
-| Method | Endpoint                          | Purpose                                              |
-| ------ | --------------------------------- | ---------------------------------------------------- |
-| POST   | `/sessions`                       | Create chat session (body: `collections: list[str]`) |
-| GET    | `/sessions/{session_id}`          | Fetch session metadata                               |
-| POST   | `/sessions/{session_id}/messages` | Save a message (`role`: `user` or `assistant`)       |
-| GET    | `/sessions/{session_id}/messages` | List all messages, ordered by `created_at`           |
-| GET    | `/healthz`                        | Health check → `{"status": "ok"}`                    |
+| Method | Endpoint                          | Purpose                                                                        |
+| ------ | --------------------------------- | ------------------------------------------------------------------------------- |
+| POST   | `/sessions`                       | Create chat session (body: `collections: list[str]`, `tools: list[str]`)       |
+| GET    | `/sessions/{session_id}`          | Fetch session metadata                                                         |
+| POST   | `/sessions/{session_id}/messages` | Save a message (`role`: `user` or `assistant`)                                 |
+| GET    | `/sessions/{session_id}/messages` | List all messages, ordered by `created_at`                                     |
+| GET    | `/mcp-servers`                    | List MCP tool servers with their discovered tools                             |
+| POST   | `/mcp-servers`                    | Add an MCP tool server (body: `name`, `url`); introspects and stores its tools |
+| POST   | `/mcp-servers/{id}/refresh`       | Re-introspect an MCP tool server and refresh its tool list                    |
+| DELETE | `/mcp-servers/{id}`               | Delete an MCP tool server                                                      |
+| GET    | `/mcp-servers/resolve`            | Resolve namespaced tool ids to server/tool metadata (used by `api`)            |
+| GET    | `/healthz`                        | Health check → `{"status": "ok"}`                                              |
 
 ## Ingestion Pipeline
 
@@ -168,16 +178,27 @@ Worker-only defaults (set in `worker/config.py`):
 
 Two tables are auto-created at `internal-api` startup via SQLAlchemy (`create_tables()`):
 
-| Table              | Column        | Type        | Notes                                   |
-| ------------------ | ------------- | ----------- | --------------------------------------- |
-| `chatbot_sessions` | `id`          | UUID PK     |                                         |
-|                    | `collections` | text[]      | Qdrant collections to search            |
-|                    | `created_at`  | timestamptz |                                         |
-| `chat_messages`    | `id`          | UUID PK     |                                         |
-|                    | `session_id`  | UUID FK     | → `chatbot_sessions.id`, cascade delete |
-|                    | `role`        | text        | `user` or `assistant`                   |
-|                    | `content`     | text        | Message body                            |
-|                    | `created_at`  | timestamptz |                                         |
+| Table                | Column                 | Type        | Notes                                       |
+| -------------------- | ---------------------- | ----------- | -------------------------------------------- |
+| `chatbot_sessions`   | `id`                   | UUID PK     |                                             |
+|                      | `collections`          | text[]      | Qdrant collections to search                |
+|                      | `tools`                | text[]      | Selected namespaced tool ids (`server.tool`) |
+|                      | `created_at`           | timestamptz |                                             |
+| `chat_messages`      | `id`                   | UUID PK     |                                             |
+|                      | `session_id`           | UUID FK     | → `chatbot_sessions.id`, cascade delete     |
+|                      | `role`                 | text        | `user` or `assistant`                       |
+|                      | `content`              | text        | Message body                                |
+|                      | `created_at`           | timestamptz |                                             |
+| `mcp_tool_servers`   | `id`                   | UUID PK     |                                             |
+|                      | `name`                 | text        | Unique namespace key                        |
+|                      | `url`                  | text        | SSE endpoint                                |
+|                      | `status`               | text        | `ok` or `unreachable`                       |
+|                      | `last_introspected_at` | timestamptz |                                             |
+| `mcp_tools`          | `id`                   | UUID PK     |                                             |
+|                      | `server_id`            | UUID FK     | → `mcp_tool_servers.id`, cascade delete     |
+|                      | `name`                 | text        | Raw MCP tool name                           |
+|                      | `description`          | text        |                                             |
+|                      | `input_schema`         | jsonb       | Raw MCP `inputSchema`                       |
 
 ## Chat Flow
 

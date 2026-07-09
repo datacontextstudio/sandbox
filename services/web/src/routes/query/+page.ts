@@ -1,13 +1,13 @@
 export const ssr = false;
 
 import type { PageLoad } from './$types';
-import { getCollections } from '$lib/api.js';
+import type { McpServer } from '$lib/api.js';
+import { getCollections, getMcpServers } from '$lib/api.js';
 
 export const load: PageLoad = async () => {
-	try {
-		const data = await getCollections();
-		return { collections: data.collections };
-	} catch {
-		return { collections: [] as string[] };
-	}
+	const [collectionsResult, serversResult] = await Promise.all([
+		getCollections().catch(() => ({ collections: [] as string[] })),
+		getMcpServers().catch(() => [] as McpServer[])
+	]);
+	return { collections: collectionsResult.collections, servers: serversResult };
 };

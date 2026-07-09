@@ -6,10 +6,11 @@
 	let { data }: { data: PageData } = $props();
 
 	let selectedCollections = $state(new Set<string>());
+	let selectedTools = $state(new Set<string>());
 	let queryText = $state('');
 	let topK = $state(5);
 	let generate = $state(true);
-	let llmModel = $state('llama3');
+	let llmModel = $state('llama3.1');
 	let includeResults = $state(false);
 
 	let isLoading = $state(false);
@@ -31,8 +32,9 @@
 		chatError = null;
 		try {
 			const cols = [...selectedCollections].sort();
-			const existing = await findChatSession(cols);
-			const sessionId = existing ? existing.id : (await createChatSession(cols)).id;
+			const tools = [...selectedTools].sort();
+			const existing = await findChatSession(cols, tools);
+			const sessionId = existing ? existing.id : (await createChatSession(cols, tools)).id;
 			window.open(`http://localhost:3001/${sessionId}`, '_blank');
 		} catch (e) {
 			chatError = String(e);
@@ -48,12 +50,22 @@
 		setTimeout(() => (copied = false), 2000);
 	}
 
-	function buildCurl(req: { query: string; collections: string[]; top_k: number; generate: boolean; llm_model: string; include_results: boolean }): string {
+	function buildCurl(req: {
+		query: string;
+		collections: string[];
+		tools: string[];
+		top_k: number;
+		generate: boolean;
+		llm_model: string;
+		include_results: boolean;
+	}): string {
 		const body = JSON.stringify(req, null, 2);
 		return `curl -X POST http://localhost:8000/query \\\n  -H "Content-Type: application/json" \\\n  -d '${body}'`;
 	}
 
-	let canSubmit = $derived(queryText.trim().length > 0 && selectedCollections.size > 0 && !isLoading);
+	let canSubmit = $derived(
+		queryText.trim().length > 0 && selectedCollections.size > 0 && !isLoading
+	);
 
 	function toggleCollection(name: string) {
 		const next = new Set(selectedCollections);
@@ -73,6 +85,16 @@
 		selectedCollections = new Set();
 	}
 
+	function toggleTool(id: string) {
+		const next = new Set(selectedTools);
+		if (next.has(id)) {
+			next.delete(id);
+		} else {
+			next.add(id);
+		}
+		selectedTools = next;
+	}
+
 	async function runQuery() {
 		if (!canSubmit) return;
 		isLoading = true;
@@ -86,6 +108,7 @@
 		const req = {
 			query: queryText,
 			collections: [...selectedCollections],
+			tools: [...selectedTools],
 			top_k: topK,
 			generate,
 			llm_model: llmModel,
@@ -108,9 +131,7 @@
 <div class="space-y-6">
 	<div>
 		<h1 class="text-2xl font-bold text-gray-900">Query Collections</h1>
-		<p class="mt-1 text-sm text-gray-500">
-			Select one or more collections and ask a question.
-		</p>
+		<p class="mt-1 text-sm text-gray-500">Select one or more collections and ask a question.</p>
 	</div>
 
 	<!-- Collections grid -->
@@ -155,6 +176,57 @@
 		{/if}
 	</div>
 
+	<!-- Tools grid -->
+	<div class="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
+		<div class="flex items-center justify-between">
+			<h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Tools</h2>
+			{#if selectedTools.size > 0}
+				<span class="text-xs text-gray-400">{selectedTools.size} selected</span>
+			{/if}
+		</div>
+
+		{#if data.servers.length === 0}
+			<p class="text-sm text-gray-400 py-4 text-center">
+				No tool servers configured yet. Add one from the <a
+					href="/tools"
+					class="text-blue-600 hover:underline">Tools</a
+				> tab.
+			</p>
+		{:else}
+			<div class="space-y-4">
+				{#each data.servers as server (server.id)}
+					<div>
+						<p class="mb-2 text-xs font-medium text-gray-500">{server.name}</p>
+						{#if server.tools.length === 0}
+							<p class="text-xs text-gray-400">No tools available on this server.</p>
+						{:else}
+							<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+								{#each server.tools as tool (tool.name)}
+									{@const toolId = `${server.name}.${tool.name}`}
+									{@const selected = selectedTools.has(toolId)}
+									<button
+										onclick={() => toggleTool(toolId)}
+										class="rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition-colors"
+										class:border-blue-500={selected}
+										class:bg-blue-50={selected}
+										class:text-blue-800={selected}
+										class:border-gray-200={!selected}
+										class:text-gray-700={!selected}
+									>
+										<span class="block truncate">{tool.name}</span>
+										{#if selected}
+											<span class="text-xs text-blue-500">✓ selected</span>
+										{/if}
+									</button>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{/if}
+	</div>
+
 	<!-- Start chat -->
 	{#if selectedCollections.size > 0}
 		<div class="flex items-center gap-3">
@@ -165,7 +237,9 @@
 			>
 				{#if isStartingChat}
 					<span class="flex items-center gap-2">
-						<span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+						<span
+							class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white"
+						></span>
 						Starting…
 					</span>
 				{:else}
@@ -189,8 +263,7 @@
 			class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 resize-y focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
 			onkeydown={(e) => {
 				if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) runQuery();
-			}}
-		></textarea>
+			}}></textarea>
 
 		<div class="flex flex-wrap items-center gap-4">
 			<label class="flex items-center gap-2 text-sm text-gray-700">
@@ -302,7 +375,9 @@
 								<div class="bg-white rounded-xl border border-gray-200 p-5">
 									<div class="flex items-center gap-2 mb-3">
 										<span class="text-xs font-medium text-gray-400">#{i + 1}</span>
-										<span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+										<span
+											class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800"
+										>
 											{result.collection_name}
 										</span>
 										<span class="ml-auto text-sm font-semibold text-green-700">
@@ -336,20 +411,37 @@
 								title="Copy to clipboard"
 							>
 								{#if copied}
-									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-										<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="h-4 w-4 text-green-400"
+										viewBox="0 0 20 20"
+										fill="currentColor"
+									>
+										<path
+											fill-rule="evenodd"
+											d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+											clip-rule="evenodd"
+										/>
 									</svg>
 									<span class="text-green-400">Copied!</span>
 								{:else}
-									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="h-4 w-4"
+										viewBox="0 0 20 20"
+										fill="currentColor"
+									>
 										<path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-										<path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+										<path
+											d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"
+										/>
 									</svg>
 									<span>Copy</span>
 								{/if}
 							</button>
 						</div>
-						<pre class="text-xs text-green-400 font-mono whitespace-pre-wrap break-all leading-relaxed">{lastQueryCurl}</pre>
+						<pre
+							class="text-xs text-green-400 font-mono whitespace-pre-wrap break-all leading-relaxed">{lastQueryCurl}</pre>
 					</div>
 				</div>
 			{/if}

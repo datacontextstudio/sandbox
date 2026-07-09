@@ -4,7 +4,25 @@ const INTERNAL_BASE = '/internal-api';
 export interface ChatSession {
 	id: string;
 	collections: string[];
+	tools: string[];
 	created_at: string;
+}
+
+export interface McpToolInfo {
+	name: string;
+	description: string | null;
+	input_schema: Record<string, unknown> | null;
+}
+
+export interface McpServer {
+	id: string;
+	name: string;
+	url: string;
+	status: string;
+	last_introspected_at: string | null;
+	created_at: string;
+	tools: McpToolInfo[];
+	detail: string | null;
 }
 
 export interface CollectionsResponse {
@@ -64,6 +82,7 @@ export interface QueryResponse {
 export interface QueryRequest {
 	query: string;
 	collections: string[];
+	tools: string[];
 	top_k: number;
 	generate: boolean;
 	llm_model: string;
@@ -130,19 +149,53 @@ export async function deleteCollection(name: string): Promise<DeleteResponse> {
 	return handleResponse<DeleteResponse>(res);
 }
 
-export async function findChatSession(collections: string[]): Promise<ChatSession | null> {
+export async function findChatSession(
+	collections: string[],
+	tools: string[] = []
+): Promise<ChatSession | null> {
 	const params = new URLSearchParams();
 	collections.forEach((c) => params.append('collections', c));
+	tools.forEach((t) => params.append('tools', t));
 	const res = await fetch(`${INTERNAL_BASE}/sessions?${params}`);
 	if (!res.ok) return null;
 	return res.json() as Promise<ChatSession | null>;
 }
 
-export async function createChatSession(collections: string[]): Promise<ChatSession> {
+export async function createChatSession(
+	collections: string[],
+	tools: string[] = []
+): Promise<ChatSession> {
 	const res = await fetch(`${INTERNAL_BASE}/sessions`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ collections })
+		body: JSON.stringify({ collections, tools })
 	});
 	return handleResponse<ChatSession>(res);
+}
+
+export async function getMcpServers(): Promise<McpServer[]> {
+	const res = await fetch(`${INTERNAL_BASE}/mcp-servers`);
+	return handleResponse<McpServer[]>(res);
+}
+
+export async function createMcpServer(name: string, url: string): Promise<McpServer> {
+	const res = await fetch(`${INTERNAL_BASE}/mcp-servers`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ name, url })
+	});
+	return handleResponse<McpServer>(res);
+}
+
+export async function refreshMcpServer(id: string): Promise<McpServer> {
+	const res = await fetch(`${INTERNAL_BASE}/mcp-servers/${id}/refresh`, { method: 'POST' });
+	return handleResponse<McpServer>(res);
+}
+
+export async function deleteMcpServer(id: string): Promise<void> {
+	const res = await fetch(`${INTERNAL_BASE}/mcp-servers/${id}`, { method: 'DELETE' });
+	if (!res.ok) {
+		const text = await res.text().catch(() => res.statusText);
+		throw new Error(`${res.status}: ${text}`);
+	}
 }

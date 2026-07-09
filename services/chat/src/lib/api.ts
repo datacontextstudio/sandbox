@@ -4,6 +4,7 @@ const API_BASE = '/api';
 export interface Session {
 	id: string;
 	collections: string[];
+	tools: string[];
 	created_at: string;
 }
 
@@ -100,6 +101,7 @@ export async function saveChatMessage(
 export async function queryCollections(
 	query: string,
 	collections: string[],
+	tools: string[] = [],
 	llmModel: string = 'llama3.1'
 ): Promise<{ answer: string | null; tool_responses: ToolResponse[] | null }> {
 	const res = await fetch(`${API_BASE}/query`, {
@@ -108,6 +110,7 @@ export async function queryCollections(
 		body: JSON.stringify({
 			query,
 			collections,
+			tools,
 			top_k: 5,
 			generate: true,
 			llm_model: llmModel,

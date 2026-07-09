@@ -14,15 +14,26 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 @router.get("", response_model=SessionResponse | None)
 async def find_session_by_collections(
     collections: list[str] = Query(...),
+    tools: list[str] = Query(default=[]),
     db: AsyncSession = Depends(get_session),
 ) -> SessionResponse | None:
     collections_array = cast(collections, ARRAY(String))
+    clauses = [
+        ChatbotSession.collections.op("@>")(collections_array),
+        func.coalesce(func.array_length(ChatbotSession.collections, 1), 0) == len(collections),
+    ]
+    if tools:
+        tools_array = cast(tools, ARRAY(String))
+        clauses += [
+            ChatbotSession.tools.op("@>")(tools_array),
+            func.coalesce(func.array_length(ChatbotSession.tools, 1), 0) == len(tools),
+        ]
+    else:
+        clauses.append(func.coalesce(func.array_length(ChatbotSession.tools, 1), 0) == 0)
+
     result = await db.execute(
         select(ChatbotSession)
-        .where(
-            ChatbotSession.collections.op("@>")(collections_array),
-            func.array_length(ChatbotSession.collections, 1) == len(collections),
-        )
+        .where(*clauses)
         .order_by(ChatbotSession.created_at.desc())
         .limit(1)
     )
@@ -37,7 +48,7 @@ async def create_session(
     body: CreateSessionRequest,
     db: AsyncSession = Depends(get_session),
 ) -> SessionResponse:
-    session = ChatbotSession(collections=body.collections)
+    session = ChatbotSession(collections=body.collections, tools=body.tools)
     db.add(session)
     await db.commit()
     await db.refresh(session)

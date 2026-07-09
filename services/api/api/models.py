@@ -31,6 +31,7 @@ class IngestResponse(BaseModel):
 class QueryRequest(BaseModel):
     query: str
     collections: list[str] = Field(default_factory=lambda: ["default"])
+    tools: list[str] | None = None
     top_k: int = 5
     generate: bool = False
     llm_model: str = "llama3.1"

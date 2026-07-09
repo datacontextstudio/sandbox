@@ -6,12 +6,42 @@ from pydantic import BaseModel
 
 class CreateSessionRequest(BaseModel):
     collections: list[str]
+    tools: list[str] = []
 
 
 class SessionResponse(BaseModel):
     id: UUID
     collections: list[str]
+    tools: list[str]
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CreateMcpServerRequest(BaseModel):
+    name: str
+    url: str
+
+
+class McpToolInfo(BaseModel):
+    name: str
+    description: str | None
+    input_schema: dict | None
+
+    class Config:
+        from_attributes = True
+
+
+class McpServerResponse(BaseModel):
+    id: UUID
+    name: str
+    url: str
+    status: str
+    last_introspected_at: datetime | None
+    created_at: datetime
+    tools: list[McpToolInfo]
+    detail: str | None = None
 
     class Config:
         from_attributes = True

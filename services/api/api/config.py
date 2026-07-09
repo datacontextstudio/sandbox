@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     storage_path: str = "/data/documents"
     embed_model: str = "nomic-embed-text"
     llm_model: str = "llama3.1"
-    mcp_servers: str = "[]"
+    internal_api_base_url: str = "http://internal-api:8001"
 
     class Config:
         env_file = ".env"

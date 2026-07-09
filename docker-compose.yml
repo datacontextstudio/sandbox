@@ -57,7 +57,6 @@ services:
       QDRANT_PORT: ${QDRANT_PORT:-6333}
       VALKEY_URL: ${VALKEY_URL:-redis://valkey:6379}
       STORAGE_PATH: /data/documents
-      MCP_SERVERS: ${MCP_SERVERS:-[]}
     volumes:
       - storage_data:/data/documents
     depends_on:

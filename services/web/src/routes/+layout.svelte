@@ -35,6 +35,14 @@
 		>
 			Collections
 		</a>
+		<a
+			href="/tools"
+			class="text-sm font-medium transition-colors"
+			class:text-white={page.url.pathname === '/tools'}
+			class:text-gray-400={page.url.pathname !== '/tools'}
+		>
+			Tools
+		</a>
 	</nav>
 	<main class="max-w-5xl mx-auto px-6 py-8">
 		{@render children()}
