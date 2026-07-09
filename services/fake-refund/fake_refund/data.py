@@ -57,23 +57,21 @@ TRANSACTIONS: list[dict] = [
 ]
 
 
-def find_transaction(transaction_id: str) -> dict | None:
+def _matches_client(txn: dict, client_id: str) -> bool:
+    needle = client_id.strip().lower()
+    return needle in txn["client_id"].lower() or needle in txn["client_name"].lower()
+
+
+def find_transaction(transaction_id: str, client_id: str) -> dict | None:
     transaction_id = transaction_id.strip().upper()
     for txn in TRANSACTIONS:
-        if txn["transaction_id"] == transaction_id:
+        if txn["transaction_id"] == transaction_id and _matches_client(txn, client_id):
             return txn
     return None
 
 
-def search_transactions(client: str = "", status: str = "") -> list[dict]:
-    results = TRANSACTIONS
-    if client:
-        needle = client.strip().lower()
-        results = [
-            txn
-            for txn in results
-            if needle in txn["client_id"].lower() or needle in txn["client_name"].lower()
-        ]
+def search_transactions(client_id: str, status: str = "") -> list[dict]:
+    results = [txn for txn in TRANSACTIONS if _matches_client(txn, client_id)]
     if status:
         needle = status.strip().lower()
         results = [txn for txn in results if txn["status"].lower() == needle]

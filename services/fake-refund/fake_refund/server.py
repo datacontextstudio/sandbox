@@ -44,14 +44,16 @@ def _format_transaction(txn: dict) -> str:
 
 
 @mcp.tool()
-def list_transactions(client: str = "", status: str = "") -> str:
-    """List Super Payments transactions, optionally filtered by client name/ID
-    ("Awesome Client Inc." / AC-2023-0034, or "Happy Client Ltd." / HC-2024-0081)
-    and/or status (Success, Failed, Refunded). Leave a parameter empty to skip
-    that filter. Use this to find a transaction_id before calling
-    get_transaction or refund_transaction.
+def list_transactions(client_id: str, status: str = "") -> str:
+    """List Super Payments transactions for one client. client_id is REQUIRED:
+    pass the client's name or ID ("Awesome Client Inc." / AC-2023-0034, or
+    "Happy Client Ltd." / HC-2024-0081). If you don't know which client the
+    user means, ask them rather than guessing. Optionally also filter by
+    status (Success, Failed, Refunded); leave status empty to skip that
+    filter. Use this to find a transaction_id before calling get_transaction
+    or refund_transaction.
     """
-    results = data.search_transactions(client=client, status=status)
+    results = data.search_transactions(client_id=client_id, status=status)
     if not results:
         return "No matching transactions found."
     header = "transaction_id | date | amount | payment_method | status"
@@ -64,19 +66,23 @@ def list_transactions(client: str = "", status: str = "") -> str:
 
 
 @mcp.tool()
-def get_transaction(transaction_id: str) -> str:
+def get_transaction(transaction_id: str, client_id: str) -> str:
     """Look up full details for one Super Payments transaction by its
     transaction_id (e.g. "SP-AC-200441"): client, date, amount, payment
     method, current status, and refund details if already refunded.
+    client_id is REQUIRED: pass the client's name or ID ("Awesome Client
+    Inc." / AC-2023-0034, or "Happy Client Ltd." / HC-2024-0081) so this only
+    ever returns a transaction belonging to that client. If you don't know
+    which client the user means, ask them rather than guessing.
     """
-    txn = data.find_transaction(transaction_id)
+    txn = data.find_transaction(transaction_id, client_id)
     if txn is None:
         return f"No transaction found with ID '{transaction_id}'."
     return _format_transaction(txn)
 
 
 @mcp.tool()
-def refund_transaction(transaction_id: str, amount: float = 0.0, reason: str = "") -> str:
+def refund_transaction(transaction_id: str, client_id: str, amount: float = 0.0, reason: str = "") -> str:
     """Issue a refund for a Super Payments transaction. Omit amount (or pass
     0) for a FULL refund of the original amount; pass a positive amount less
     than the original for a PARTIAL refund. Fails with a clear message if the
@@ -84,9 +90,13 @@ def refund_transaction(transaction_id: str, amount: float = 0.0, reason: str = "
     or the requested amount exceeds the original. On success, returns the
     refund type, amount, and an estimated processing time based on the
     original payment method (cards 5-10 business days, Apple/Google Pay 3-5
-    days, PayPal 1-3 days, Klarna 5-7 days, Wire/ACH 3-7 days).
+    days, PayPal 1-3 days, Klarna 5-7 days, Wire/ACH 3-7 days). client_id is
+    REQUIRED: pass the client's name or ID ("Awesome Client Inc." /
+    AC-2023-0034, or "Happy Client Ltd." / HC-2024-0081) so this can only
+    ever refund a transaction belonging to that client. If you don't know
+    which client the user means, ask them rather than guessing.
     """
-    txn = data.find_transaction(transaction_id)
+    txn = data.find_transaction(transaction_id, client_id)
     if txn is None:
         return f"No transaction found with ID '{transaction_id}'."
     if txn["status"] == "Refunded":
