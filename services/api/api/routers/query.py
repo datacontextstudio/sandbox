@@ -28,11 +28,13 @@ async def query(req: QueryRequest) -> QueryResponse:
 
     answer: str | None = None
     tool_responses: list[ToolResponse] = []
-    if req.generate and results:
-        context = "\n\n".join(r.text for r in results)
+    tools = await get_tools(settings.mcp_servers) if req.generate else []
+    if req.generate and (results or tools):
+        context = "\n\n".join(r.text for r in results) if results else ""
         user_content = (
-            f"Use the following context to answer the question.\n\n"
-            f"Context:\n{context}\n\n"
+            f"Background context (may or may not be relevant; do not treat as authoritative "
+            f"for live/current data such as transaction status):\n"
+            f"{context or '(no relevant documents retrieved for this query)'}\n\n"
             f"Question: {req.query}\n\n"
             f"Answer:"
         )
@@ -40,16 +42,28 @@ async def query(req: QueryRequest) -> QueryResponse:
             {
                 "role": "system",
                 "content": (
-                    "You are a helpful assistant. Answer questions directly and concisely "
-                    "using the provided context. Do not begin your answer with phrases like "
-                    "'According to the context', 'Based on the context', or similar meta-references. "
-                    "Just answer the question. You may use bullet points."
+                    "You are a helpful assistant. Answer questions directly and concisely. "
+                    "Never mention or reference your own process: do not refer to 'the context', "
+                    "'the provided documents', 'the retrieved text', 'section X', 'the transaction log', "
+                    "tool names, function calls, or how you arrived at your answer, anywhere in your reply "
+                    "-- not just at the start. Do not narrate your own reasoning, self-corrections, or "
+                    "internal steps (for example, never say things like 'so I removed it from the list' "
+                    "or 'let me check that'). Just state the answer as fact, in your own words, as if you "
+                    "already knew it. You may use bullet points.\n\n"
+                    "When tools are available: if the user asks about a specific transaction's current "
+                    "status, asks you to list or look up transactions, or asks you to perform an action "
+                    "such as issuing a refund, you MUST call the appropriate tool and base your answer "
+                    "only on that tool's result. Retrieved background documents (policy text, sample "
+                    "reports, FAQs) are general reference material only -- they are never a source of "
+                    "truth for a specific transaction's live status, and must never be used to answer "
+                    "questions that a tool can answer. Never claim an action such as a refund was "
+                    "completed, and never state a transaction's status, unless a tool call actually "
+                    "confirmed it in this conversation. If a required tool call fails or a tool is "
+                    "unavailable, say so plainly instead of guessing or inventing a result."
                 ),
             },
             {"role": "user", "content": user_content},
         ]
-
-        tools = await get_tools(settings.mcp_servers)
 
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
