@@ -53,6 +53,8 @@ def list_transactions(client_id: str, status: str = "") -> str:
     filter. Use this to find a transaction_id before calling get_transaction
     or refund_transaction.
     """
+    if not client_id.strip():
+        return "client_id is required. Ask the user which client they mean before calling this tool."
     results = data.search_transactions(client_id=client_id, status=status)
     if not results:
         return "No matching transactions found."
@@ -75,6 +77,8 @@ def get_transaction(transaction_id: str, client_id: str) -> str:
     ever returns a transaction belonging to that client. If you don't know
     which client the user means, ask them rather than guessing.
     """
+    if not client_id.strip():
+        return "client_id is required. Ask the user which client they mean before calling this tool."
     txn = data.find_transaction(transaction_id, client_id)
     if txn is None:
         return f"No transaction found with ID '{transaction_id}'."
@@ -96,6 +100,8 @@ def refund_transaction(transaction_id: str, client_id: str, amount: float = 0.0,
     ever refund a transaction belonging to that client. If you don't know
     which client the user means, ask them rather than guessing.
     """
+    if not client_id.strip():
+        return "client_id is required. Ask the user which client they mean before calling this tool."
     txn = data.find_transaction(transaction_id, client_id)
     if txn is None:
         return f"No transaction found with ID '{transaction_id}'."

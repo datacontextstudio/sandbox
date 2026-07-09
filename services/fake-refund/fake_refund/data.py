@@ -59,6 +59,8 @@ TRANSACTIONS: list[dict] = [
 
 def _matches_client(txn: dict, client_id: str) -> bool:
     needle = client_id.strip().lower()
+    if not needle:
+        return False
     return needle in txn["client_id"].lower() or needle in txn["client_name"].lower()
 
 
