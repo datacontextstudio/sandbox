@@ -61,6 +61,16 @@ export async function updateChatTitle(sessionId: string, chatId: string, title: 
 	return handleResponse<Chat>(res);
 }
 
+export async function deleteChat(sessionId: string, chatId: string): Promise<void> {
+	const res = await fetch(`${INTERNAL_BASE}/sessions/${sessionId}/chats/${chatId}`, {
+		method: 'DELETE'
+	});
+	if (!res.ok) {
+		const text = await res.text().catch(() => res.statusText);
+		throw new Error(`${res.status}: ${text}`);
+	}
+}
+
 export async function getChatMessages(sessionId: string, chatId: string): Promise<Message[]> {
 	const res = await fetch(`${INTERNAL_BASE}/sessions/${sessionId}/chats/${chatId}/messages`);
 	return handleResponse<Message[]>(res);

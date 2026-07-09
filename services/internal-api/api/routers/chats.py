@@ -73,3 +73,19 @@ async def update_chat(
     await db.commit()
     await db.refresh(chat)
     return ChatResponse.model_validate(chat)
+
+
+@router.delete("/{chat_id}", status_code=204)
+async def delete_chat(
+    session_id: UUID,
+    chat_id: UUID,
+    db: AsyncSession = Depends(get_session),
+) -> None:
+    result = await db.execute(
+        select(Chat).where(Chat.id == chat_id, Chat.session_id == session_id)
+    )
+    chat = result.scalar_one_or_none()
+    if chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    await db.delete(chat)
+    await db.commit()
