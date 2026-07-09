@@ -26,7 +26,12 @@ async def create_message(
     db: AsyncSession = Depends(get_session),
 ) -> MessageResponse:
     await _require_chat(session_id, chat_id, db)
-    message = ChatMessage(chat_id=chat_id, role=body.role, content=body.content)
+    tool_responses = (
+        [tr.model_dump() for tr in body.tool_responses] if body.tool_responses else None
+    )
+    message = ChatMessage(
+        chat_id=chat_id, role=body.role, content=body.content, tool_responses=tool_responses
+    )
     db.add(message)
     await db.commit()
     await db.refresh(message)

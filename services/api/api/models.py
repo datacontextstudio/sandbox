@@ -46,10 +46,16 @@ class QueryResult(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class ToolResponse(BaseModel):
+    tool: str
+    response: str
+
+
 class QueryResponse(BaseModel):
     query: str
     results: list[QueryResult] | None = None
     answer: str | None = None
+    tool_responses: list[ToolResponse] | None = None
 
 
 class JobStatusResponse(BaseModel):

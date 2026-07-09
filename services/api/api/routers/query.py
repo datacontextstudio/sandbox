@@ -4,7 +4,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 
 from api.config import settings
-from api.models import QueryRequest, QueryResponse
+from api.models import QueryRequest, QueryResponse, ToolResponse
 from api.services import embedder
 from api.services.mcp_client import call_tool, get_tools
 from api.services.searcher import search_many
@@ -27,6 +27,7 @@ async def query(req: QueryRequest) -> QueryResponse:
         raise HTTPException(status_code=502, detail=f"Search error: {exc}")
 
     answer: str | None = None
+    tool_responses: list[ToolResponse] = []
     if req.generate and results:
         context = "\n\n".join(r.text for r in results)
         user_content = (
@@ -82,6 +83,7 @@ async def query(req: QueryRequest) -> QueryResponse:
                         if isinstance(args, str):
                             args = json.loads(args)
                         result = await call_tool(settings.mcp_servers, name, args)
+                        tool_responses.append(ToolResponse(tool=name, response=result))
                         messages.append({"role": "tool", "content": result})
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail=f"LLM service error: {exc}")
@@ -90,4 +92,5 @@ async def query(req: QueryRequest) -> QueryResponse:
         query=req.query,
         results=results if req.include_results else None,
         answer=answer,
+        tool_responses=tool_responses or None,
     )

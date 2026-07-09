@@ -49,10 +49,16 @@ export interface QueryResult {
 	metadata: Record<string, unknown>;
 }
 
+export interface ToolResponse {
+	tool: string;
+	response: string;
+}
+
 export interface QueryResponse {
 	query: string;
 	results: QueryResult[] | null;
 	answer: string | null;
+	tool_responses: ToolResponse[] | null;
 }
 
 export interface QueryRequest {

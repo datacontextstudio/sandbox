@@ -14,11 +14,17 @@ export interface Chat {
 	created_at: string;
 }
 
+export interface ToolResponse {
+	tool: string;
+	response: string;
+}
+
 export interface Message {
 	id: string;
 	chat_id: string;
 	role: 'user' | 'assistant';
 	content: string;
+	tool_responses: ToolResponse[] | null;
 	created_at: string;
 }
 
@@ -80,12 +86,13 @@ export async function saveChatMessage(
 	sessionId: string,
 	chatId: string,
 	role: string,
-	content: string
+	content: string,
+	toolResponses?: ToolResponse[] | null
 ): Promise<Message> {
 	const res = await fetch(`${INTERNAL_BASE}/sessions/${sessionId}/chats/${chatId}/messages`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ role, content })
+		body: JSON.stringify({ role, content, tool_responses: toolResponses ?? null })
 	});
 	return handleResponse<Message>(res);
 }
@@ -94,7 +101,7 @@ export async function queryCollections(
 	query: string,
 	collections: string[],
 	llmModel: string = 'llama3.1'
-): Promise<string | null> {
+): Promise<{ answer: string | null; tool_responses: ToolResponse[] | null }> {
 	const res = await fetch(`${API_BASE}/query`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
@@ -107,8 +114,10 @@ export async function queryCollections(
 			include_results: false
 		})
 	});
-	const data = await handleResponse<{ answer: string | null }>(res);
-	return data.answer;
+	const data = await handleResponse<{ answer: string | null; tool_responses: ToolResponse[] | null }>(
+		res
+	);
+	return { answer: data.answer, tool_responses: data.tool_responses };
 }
 
 export async function generateTitle(

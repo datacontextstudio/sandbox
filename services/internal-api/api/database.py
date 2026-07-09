@@ -1,7 +1,7 @@
 import uuid
 
 from sqlalchemy import ARRAY, Column, DateTime, ForeignKey, String, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -44,6 +44,7 @@ class ChatMessage(Base):
     chat_id = Column(UUID(as_uuid=True), ForeignKey("chats.id", ondelete="CASCADE"), nullable=False)
     role = Column(String(10), nullable=False)
     content = Column(String, nullable=False)
+    tool_responses = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=text("NOW()"))
 
     chat = relationship("Chat", back_populates="messages")

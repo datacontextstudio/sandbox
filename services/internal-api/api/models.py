@@ -35,9 +35,15 @@ class ChatResponse(BaseModel):
         from_attributes = True
 
 
+class ToolResponse(BaseModel):
+    tool: str
+    response: str
+
+
 class CreateMessageRequest(BaseModel):
     role: str
     content: str
+    tool_responses: list[ToolResponse] | None = None
 
 
 class MessageResponse(BaseModel):
@@ -45,6 +51,7 @@ class MessageResponse(BaseModel):
     chat_id: UUID
     role: str
     content: str
+    tool_responses: list[ToolResponse] | None = None
     created_at: datetime
 
     class Config:
